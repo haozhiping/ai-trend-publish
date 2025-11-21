@@ -9,7 +9,7 @@ async function bootstrap() {
   Logger.level = LogLevel.INFO;
 
   startCronJobs();
-  startServer();
+  await startServer();
 }
 
 bootstrap().catch(console.error);

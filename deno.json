@@ -19,7 +19,8 @@
     "@sapling/markdown": "https://deno.land/x/sapling_markdown@v1.0.0/mod.ts",
     "drizzle-kit": "npm:drizzle-kit@^0.30.5",
     "drizzle-orm": "npm:drizzle-orm@^0.40.0",
-    "mysql2": "npm:mysql2@^3.13.0"
+    "mysql2": "npm:mysql2@^3.13.0",
+    "bcryptjs": "npm:bcryptjs@^2.4.3"
   },
   "exclude": [
     "node_modules",

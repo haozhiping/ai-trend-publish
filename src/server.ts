@@ -1,6 +1,18 @@
 import { triggerWorkflow } from "./controllers/workflow.controller.ts";
 import { WorkflowType } from "./controllers/cron.ts";
 import { ConfigManager } from "@src/utils/config/config-manager.ts";
+import { handleLogin, handleGetUser, handleLogout } from "./controllers/auth.controller.ts";
+import {
+  handleGetWorkflows,
+  handleGetWorkflow,
+  handleCreateWorkflow,
+  handleUpdateWorkflow,
+  handleDeleteWorkflow,
+  handleStartWorkflow,
+  handleStopWorkflow,
+  handleExecuteWorkflow,
+} from "./controllers/workflow-rest.controller.ts";
+import { initializeWorkflows } from "./services/workflow.service.ts";
 
 
 export interface JSONRPCRequest {
@@ -103,62 +115,161 @@ export class JSONRPCServer {
 const rpcServer = new JSONRPCServer();
 rpcServer.registerRoute("triggerWorkflow", triggerWorkflow);
 
+// CORS 响应头
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// 处理 OPTIONS 请求（CORS 预检）
+function handleOptions(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
+// REST API 路由处理
+async function handleRestApi(req: Request, path: string): Promise<Response | null> {
+  const method = req.method;
+  const pathParts = path.split("/").filter(p => p);
+
+  // 认证相关接口（不需要 JWT 验证）
+  if (pathParts[0] === "api" && pathParts[1] === "auth") {
+    if (pathParts[2] === "login" && method === "POST") {
+      return await handleLogin(req);
+    }
+    if (pathParts[2] === "user" && method === "GET") {
+      return await handleGetUser(req);
+    }
+    if (pathParts[2] === "logout" && method === "POST") {
+      return await handleLogout(req);
+    }
+  }
+
+  // 工作流管理接口
+  if (pathParts[0] === "api" && pathParts[1] === "workflows") {
+    if (method === "GET" && pathParts.length === 2) {
+      // GET /api/workflows
+      return await handleGetWorkflows(req);
+    }
+    if (method === "POST" && pathParts.length === 2) {
+      // POST /api/workflows
+      return await handleCreateWorkflow(req);
+    }
+    if (method === "GET" && pathParts.length === 3) {
+      // GET /api/workflows/:id
+      return await handleGetWorkflow(req, pathParts[2]);
+    }
+    if (method === "PUT" && pathParts.length === 3) {
+      // PUT /api/workflows/:id
+      return await handleUpdateWorkflow(req, pathParts[2]);
+    }
+    if (method === "DELETE" && pathParts.length === 3) {
+      // DELETE /api/workflows/:id
+      return await handleDeleteWorkflow(req, pathParts[2]);
+    }
+    if (method === "POST" && pathParts.length === 4) {
+      // POST /api/workflows/:id/start
+      if (pathParts[3] === "start") {
+        return await handleStartWorkflow(req, pathParts[2]);
+      }
+      // POST /api/workflows/:id/stop
+      if (pathParts[3] === "stop") {
+        return await handleStopWorkflow(req, pathParts[2]);
+      }
+      // POST /api/workflows/:id/execute
+      if (pathParts[3] === "execute") {
+        return await handleExecuteWorkflow(req, pathParts[2]);
+      }
+    }
+  }
+
+  return null;
+}
+
 // 请求处理器
 const handler = async (req: Request): Promise<Response> => {
   try {
-    // 验证 Authorization 请求头
-    const configManager = ConfigManager.getInstance();
-    const API_KEY = await configManager.get("SERVER_API_KEY");
-
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.split(" ")[1] !==  API_KEY) {
-      return new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: {
-            code: -32001,
-            message: "未授权的访问",
-            data: {
-              error: "缺少有效的 Authorization 请求头"
-            }
-          },
-        }),
-        {
-          status: 401,
-          headers: {
-            "Content-Type": "application/json",
-          }
-        }
-      );
+    // 处理 CORS 预检请求
+    if (req.method === "OPTIONS") {
+      return handleOptions();
     }
 
     const url = new URL(req.url);
-    
-    // 规范化路径（移除开头和结尾的斜杠，处理可能的错误格式）
     const normalizedPath = url.pathname.replace(/^\/+|\/+$/g, "");
-    
-    // 只处理 api/workflow 路径的请求
-    if (normalizedPath === "api/workflow") {
-      return await rpcServer.handleRequest(req);
+
+    // 简单访问日志，便于排查前端是否真正调用到后端
+    console.log(`[HTTP] ${req.method} ${normalizedPath}`);
+
+    // 先尝试 REST API 路由
+    const restResponse = await handleRestApi(req, normalizedPath);
+    if (restResponse) {
+      // 添加 CORS 头
+      const headers = new Headers(restResponse.headers);
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+      return new Response(restResponse.body, {
+        status: restResponse.status,
+        headers,
+      });
     }
 
-    // 处理其他请求
+    // 处理 JSON-RPC 接口（保留向后兼容）
+    if (normalizedPath === "api/workflow") {
+      // 验证 Authorization 请求头（JSON-RPC 使用 API_KEY）
+      const configManager = ConfigManager.getInstance();
+      const API_KEY = await configManager.get("SERVER_API_KEY");
+
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.split(" ")[1] !== API_KEY) {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32001,
+              message: "未授权的访问",
+              data: {
+                error: "缺少有效的 Authorization 请求头"
+              }
+            },
+          }),
+          {
+            status: 401,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders,
+            }
+          }
+        );
+      }
+
+      const rpcResponse = await rpcServer.handleRequest(req);
+      // 添加 CORS 头
+      const headers = new Headers(rpcResponse.headers);
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+      return new Response(rpcResponse.body, {
+        status: rpcResponse.status,
+        headers,
+      });
+    }
+
+    // 404 未找到
     return new Response(
       JSON.stringify({
-        jsonrpc: "2.0",
-        error: {
-          code: -32601,
-          message: "无效的API路径",
-          data: {
-            path: normalizedPath,
-            expectedPath: "api/workflow"
-          }
-        },
+        code: 404,
+        message: "接口不存在",
+        path: normalizedPath,
       }),
       {
         status: 404,
         headers: {
           "Content-Type": "application/json",
+          ...corsHeaders,
         }
       }
     );
@@ -166,29 +277,45 @@ const handler = async (req: Request): Promise<Response> => {
     console.error("请求处理错误:", error);
     return new Response(
       JSON.stringify({
-        jsonrpc: "2.0",
-        error: {
-          code: -32603,
-          message: "服务器内部错误",
-          data: {
-            error: error instanceof Error ? error.message : String(error)
-          }
-        },
+        code: 500,
+        message: "服务器内部错误",
+        error: error instanceof Error ? error.message : String(error)
       }),
       {
         status: 500,
         headers: {
           "Content-Type": "application/json",
+          ...corsHeaders,
         }
       }
     );
   }
 };
 
-export default function startServer(port = 8000) {
+export default async function startServer(port = 8500) {
+  // 初始化工作流服务（从数据库加载运行中的工作流）
+  try {
+    await initializeWorkflows();
+  } catch (error) {
+    console.error("初始化工作流失败:", error);
+  }
+
   Deno.serve({ port }, handler);
-  console.log(`JSON-RPC 服务器运行在 http://localhost:${port}`);
-  console.log("支持的方法:");
-  console.log("- triggerWorkflow");
-  console.log(`可用的工作流类型: ${Object.values(WorkflowType).join(", ")}`);
+  console.log(`服务器运行在 http://localhost:${port}`);
+  console.log("\n支持的接口:");
+  console.log("REST API:");
+  console.log("  POST   /api/auth/login          - 用户登录");
+  console.log("  GET    /api/auth/user           - 获取用户信息");
+  console.log("  POST   /api/auth/logout        - 用户登出");
+  console.log("  GET    /api/workflows          - 获取工作流列表");
+  console.log("  POST   /api/workflows          - 创建工作流");
+  console.log("  GET    /api/workflows/:id      - 获取工作流详情");
+  console.log("  PUT    /api/workflows/:id      - 更新工作流");
+  console.log("  DELETE /api/workflows/:id      - 删除工作流");
+  console.log("  POST   /api/workflows/:id/start   - 启动工作流");
+  console.log("  POST   /api/workflows/:id/stop    - 停止工作流");
+  console.log("  POST   /api/workflows/:id/execute - 立即执行工作流");
+  console.log("\nJSON-RPC API (向后兼容):");
+  console.log("  POST   /api/workflow           - 触发工作流");
+  console.log(`  可用的工作流类型: ${Object.values(WorkflowType).join(", ")}`);
 }

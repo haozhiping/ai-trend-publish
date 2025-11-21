@@ -72,3 +72,70 @@ export const vectorItems = mysqlTable("vector_items", {
 (table) => [
 	primaryKey({ columns: [table.id], name: "vector_items_id"}),
 ]);
+
+export const users = mysqlTable("users", {
+	id: int().autoincrement().notNull(),
+	username: varchar({ length: 50 }).notNull(),
+	password: varchar({ length: 255 }).notNull(),
+	email: varchar({ length: 100 }),
+	name: varchar({ length: 100 }),
+	avatar: varchar({ length: 255 }),
+	role: varchar({ length: 20 }).default("user").notNull(),
+	permissions: json(),
+	status: tinyint().default(1).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+	lastLoginAt: timestamp("last_login_at", { mode: 'date' }),
+},
+(table) => [
+	primaryKey({ columns: [table.id], name: "users_id"}),
+	index("idx_username").on(table.username),
+	index("idx_email").on(table.email),
+]);
+
+export const workflows = mysqlTable("workflows", {
+	id: int().autoincrement().notNull(),
+	name: varchar({ length: 255 }).notNull(),
+	type: varchar({ length: 50 }).notNull(),
+	description: text(),
+	status: varchar({ length: 20 }).default("stopped").notNull(),
+	schedule: varchar({ length: 100 }),
+	config: json(),
+	lastRun: timestamp("last_run", { mode: 'date' }),
+	nextRun: timestamp("next_run", { mode: 'date' }),
+	runCount: int("run_count").default(0),
+	successCount: int("success_count").default(0),
+	failCount: int("fail_count").default(0),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+	createdBy: int("created_by"),
+},
+(table) => [
+	primaryKey({ columns: [table.id], name: "workflows_id"}),
+	index("idx_type").on(table.type),
+	index("idx_status").on(table.status),
+]);
+
+export const publishHistory = mysqlTable("publish_history", {
+	id: bigint({ mode: "number" }).autoincrement().notNull(),
+	title: varchar({ length: 500 }).notNull(),
+	platform: varchar({ length: 50 }).notNull(),
+	status: varchar({ length: 20 }).notNull(),
+	publishTime: timestamp("publish_time", { mode: 'string' }).notNull(),
+	url: varchar({ length: 1000 }),
+	articleCount: int("article_count").default(0),
+	successCount: int("success_count").default(0),
+	failCount: int("fail_count").default(0),
+	workflowType: varchar("workflow_type", { length: 50 }),
+	workflowId: int("workflow_id"),
+	errorMessage: text("error_message"),
+	metadata: json(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+},
+(table) => [
+	primaryKey({ columns: [table.id], name: "publish_history_id"}),
+	index("idx_platform").on(table.platform),
+	index("idx_status").on(table.status),
+	index("idx_publish_time").on(table.publishTime),
+	index("idx_workflow_type").on(table.workflowType),
+]);
