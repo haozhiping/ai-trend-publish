@@ -30,6 +30,9 @@ import { EmbeddingProvider } from "@src/providers/interfaces/embedding.interface
 import { EmbeddingFactory } from "@src/providers/embedding/embedding-factory.ts";
 import { EmbeddingProviderType } from "@src/providers/interfaces/embedding.interface.ts";
 import { VectorSimilarityUtil } from "@src/utils/VectorSimilarityUtil.ts";
+import db from "@src/db/db.ts";
+import { content } from "@src/db/schema.ts";
+import { eq } from "drizzle-orm";
 const logger = new Logger("weixin-article-workflow");
 
 interface WeixinWorkflowEnv {
@@ -368,6 +371,76 @@ export class WeixinArticleWorkflow
         }));
 
         return topContents;
+      });
+
+      // 6.5. 保存内容到内容库
+      await step.do("save-contents", {
+        retries: { limit: 2, delay: "5 second", backoff: "exponential" },
+        timeout: "5 minutes",
+      }, async () => {
+        logger.info(`[内容保存] 开始保存 ${processedContents.length} 条内容到内容库`);
+        
+        // 辅助函数：从 URL 推断 source
+        const inferSource = (url: string, metadataSource?: string): string => {
+          if (metadataSource) return metadataSource.toLowerCase();
+          if (url.includes("twitter.com") || url.includes("x.com")) return "twitter";
+          if (url.includes("github.com")) return "hellogithub";
+          return "firecrawl";
+        };
+        
+        for (const scrapedContent of processedContents) {
+          try {
+            const inferredSource = inferSource(
+              scrapedContent.url,
+              scrapedContent.metadata.source
+            );
+            
+            // 检查是否已存在（根据 URL）
+            const existing = await db
+              .select()
+              .from(content)
+              .where(eq(content.url, scrapedContent.url))
+              .limit(1);
+
+            if (existing.length > 0) {
+              // 更新已存在的内容
+              await db
+                .update(content)
+                .set({
+                  title: scrapedContent.title,
+                  content: scrapedContent.content,
+                  summary: scrapedContent.metadata.summary || null,
+                  score: scrapedContent.metadata.score || null,
+                  keywords: scrapedContent.metadata.keywords ? JSON.stringify(scrapedContent.metadata.keywords) : null,
+                  status: "published",
+                  publishDate: scrapedContent.publishDate ? new Date(scrapedContent.publishDate) : null,
+                  updatedAt: new Date().toISOString(),
+                })
+                .where(eq(content.id, existing[0].id));
+              logger.debug(`[内容保存] 更新内容: ${scrapedContent.title}`);
+            } else {
+              // 插入新内容
+              await db.insert(content).values({
+                title: scrapedContent.title,
+                content: scrapedContent.content,
+                summary: scrapedContent.metadata.summary || null,
+                url: scrapedContent.url,
+                source: inferredSource,
+                platform: "weixin",
+                score: scrapedContent.metadata.score || null,
+                keywords: scrapedContent.metadata.keywords ? JSON.stringify(scrapedContent.metadata.keywords) : null,
+                status: "published",
+                publishDate: scrapedContent.publishDate ? new Date(scrapedContent.publishDate) : null,
+              });
+              logger.debug(`[内容保存] 新增内容: ${scrapedContent.title} (来源: ${inferredSource})`);
+            }
+          } catch (error) {
+            logger.error(`[内容保存] 保存内容失败: ${scrapedContent.title}`, error);
+            // 继续处理下一条，不中断整个流程
+          }
+        }
+        
+        logger.info("[内容保存] 内容保存完成");
       });
 
       // 7. 生成文章

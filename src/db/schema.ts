@@ -1,4 +1,4 @@
-import { mysqlTable, mysqlSchema, AnyMySqlColumn, primaryKey, int, varchar, index, foreignKey, text, json, timestamp, bigint, tinyint } from "drizzle-orm/mysql-core"
+import { mysqlTable, mysqlSchema, AnyMySqlColumn, primaryKey, int, varchar, index, foreignKey, text, json, timestamp, bigint, tinyint, double } from "drizzle-orm/mysql-core"
 import { sql } from "drizzle-orm"
 
 export const config = mysqlTable("config", {
@@ -60,6 +60,30 @@ export const templates = mysqlTable("templates", {
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "templates_id"}),
+]);
+
+// 内容表（内容库）
+export const content = mysqlTable("content", {
+	id: bigint({ mode: "number" }).autoincrement().notNull(),
+	title: varchar({ length: 500 }).notNull(),
+	content: text(),
+	summary: text(),
+	url: varchar({ length: 1000 }),
+	source: varchar({ length: 50 }).notNull(),
+	platform: varchar({ length: 50 }),
+	score: double("score"),
+	keywords: json(),
+	tags: json(),
+	status: varchar({ length: 20 }).default("draft").notNull(),
+	publishDate: timestamp("publish_date", { mode: "date" }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+},
+(table) => [
+	primaryKey({ columns: [table.id], name: "content_id"}),
+	index("idx_source").on(table.source),
+	index("idx_status").on(table.status),
+	index("idx_publish_date").on(table.publishDate),
 ]);
 
 export const vectorItems = mysqlTable("vector_items", {

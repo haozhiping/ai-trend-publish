@@ -12,6 +12,8 @@ import {
   handleStopWorkflow,
   handleExecuteWorkflow,
 } from "./controllers/workflow-rest.controller.ts";
+import { handleGetContents, handleGetContent, handleDeleteContent } from "./controllers/content-rest.controller.ts";
+import { handleGetConfig, handleUpdateConfig } from "./controllers/config-rest.controller.ts";
 import { initializeWorkflows } from "./services/workflow.service.ts";
 
 
@@ -186,6 +188,34 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
     }
   }
 
+  // 内容库接口
+  if (pathParts[0] === "api" && pathParts[1] === "content") {
+    if (method === "GET" && pathParts.length === 2) {
+      // GET /api/content
+      return await handleGetContents(req);
+    }
+    if (method === "GET" && pathParts.length === 3) {
+      // GET /api/content/:id
+      return await handleGetContent(req, pathParts[2]);
+    }
+    if (method === "DELETE" && pathParts.length === 3) {
+      // DELETE /api/content/:id
+      return await handleDeleteContent(req, pathParts[2]);
+    }
+  }
+
+  // 系统配置接口
+  if (pathParts[0] === "api" && pathParts[1] === "config") {
+    if (method === "GET" && pathParts.length === 2) {
+      // GET /api/config
+      return await handleGetConfig(req);
+    }
+    if (method === "PUT" && pathParts.length === 2) {
+      // PUT /api/config
+      return await handleUpdateConfig(req);
+    }
+  }
+
   return null;
 }
 
@@ -220,31 +250,31 @@ const handler = async (req: Request): Promise<Response> => {
     // 处理 JSON-RPC 接口（保留向后兼容）
     if (normalizedPath === "api/workflow") {
       // 验证 Authorization 请求头（JSON-RPC 使用 API_KEY）
-      const configManager = ConfigManager.getInstance();
-      const API_KEY = await configManager.get("SERVER_API_KEY");
+    const configManager = ConfigManager.getInstance();
+    const API_KEY = await configManager.get("SERVER_API_KEY");
 
-      const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("Authorization");
       if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.split(" ")[1] !== API_KEY) {
-        return new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32001,
-              message: "未授权的访问",
-              data: {
-                error: "缺少有效的 Authorization 请求头"
-              }
-            },
-          }),
-          {
-            status: 401,
-            headers: {
-              "Content-Type": "application/json",
-              ...corsHeaders,
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: {
+            code: -32001,
+            message: "未授权的访问",
+            data: {
+              error: "缺少有效的 Authorization 请求头"
             }
+          },
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+              ...corsHeaders,
           }
-        );
-      }
+        }
+      );
+    }
 
       const rpcResponse = await rpcServer.handleRequest(req);
       // 添加 CORS 头
@@ -263,7 +293,7 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({
         code: 404,
         message: "接口不存在",
-        path: normalizedPath,
+            path: normalizedPath,
       }),
       {
         status: 404,
@@ -278,8 +308,8 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({
         code: 500,
-        message: "服务器内部错误",
-        error: error instanceof Error ? error.message : String(error)
+          message: "服务器内部错误",
+            error: error instanceof Error ? error.message : String(error)
       }),
       {
         status: 500,
@@ -315,6 +345,8 @@ export default async function startServer(port = 8500) {
   console.log("  POST   /api/workflows/:id/start   - 启动工作流");
   console.log("  POST   /api/workflows/:id/stop    - 停止工作流");
   console.log("  POST   /api/workflows/:id/execute - 立即执行工作流");
+  console.log("  GET    /api/config               - 获取系统配置");
+  console.log("  PUT    /api/config               - 更新系统配置");
   console.log("\nJSON-RPC API (向后兼容):");
   console.log("  POST   /api/workflow           - 触发工作流");
   console.log(`  可用的工作流类型: ${Object.values(WorkflowType).join(", ")}`);
