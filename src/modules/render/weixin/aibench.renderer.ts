@@ -6,6 +6,11 @@ import {
   ModelScore,
 } from "@src/modules/render/weixin/interfaces/aibench.type.ts";
 import ejs from "npm:ejs";
+import {
+  formatBeijingDate,
+  formatBeijingDateTime,
+  getBeijingNow,
+} from "@src/utils/time.util.ts";
 
 /**
  * AI Benchmark模板渲染器
@@ -106,9 +111,10 @@ export class AIBenchTemplateRenderer
     });
 
     // 创建并返回AIBenchTemplate对象
+    const now = getBeijingNow();
     return {
-      title: `AI模型性能评测 - ${new Date().toLocaleDateString()}`,
-      updateTime: new Date().toISOString(),
+      title: `AI模型性能评测 - ${formatBeijingDate(now)}`,
+      updateTime: formatBeijingDateTime(now) ?? undefined,
       categories: categories,
       globalTop10: allModels.slice(0, 10),
     };

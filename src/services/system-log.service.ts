@@ -1,6 +1,7 @@
 import db from "@src/db/db.ts";
 import { systemLogs } from "@src/db/schema.ts";
 import { and, eq, gte, lte, desc, sql, like } from "drizzle-orm";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 export interface SystemLogFilter {
   level?: string;
@@ -61,7 +62,7 @@ function mapLog(row: any): SystemLogRecord {
     workflowId: row.workflowId,
     workflowType: row.workflowType,
     eventId: row.eventId,
-    createdAt: row.createdAt,
+    createdAt: formatBeijingDateTime(row.createdAt) ?? "",
   };
 }
 

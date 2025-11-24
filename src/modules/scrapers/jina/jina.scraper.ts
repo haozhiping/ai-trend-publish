@@ -7,6 +7,7 @@ import {
   Media,
 } from "@src/modules/interfaces/scraper.interface.ts";
 import { z } from "npm:zod@3.23.8";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 // Define a schema for the Jina API response for stricter parsing.
 const JinaResponseSchema = z.object({
@@ -108,7 +109,7 @@ export class JinaScraper implements ContentScraper {
         title: jinaData.title,
         content: jinaData.content,
         url: jinaData.url, // Jina provides the original URL back
-        publishDate: new Date().toISOString(), // Jina doesn't provide a publish date
+        publishDate: formatBeijingDateTime(new Date()),
         media: media,
         metadata: {
           // Store any other relevant data from Jina's response

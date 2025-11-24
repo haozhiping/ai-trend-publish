@@ -14,6 +14,11 @@ import {
   WorkflowStep,
 } from "@src/works/workflow.ts";
 import { WorkflowTerminateError } from "@src/works/workflow-error.ts";
+import {
+  formatBeijingDate,
+  formatBeijingDateTime,
+  getBeijingNow,
+} from "@src/utils/time.util.ts";
 import { Logger } from "@zilla/logger";
 import { ImageGeneratorType } from "@src/providers/interfaces/image-gen.interface.ts";
 
@@ -108,11 +113,11 @@ export class WeixinAIBenchWorkflow extends WorkflowEntrypoint<
 
       // 3. 准备模板数据
       const templateData = await step.do("prepare-template-data", async () => {
+        const now = getBeijingNow();
+        const formattedDate = formatBeijingDate(now) ?? "";
         const data = {
-          title: `${topModelName}领跑！AI模型性能榜单 - ${
-            new Date().toLocaleDateString()
-          }`,
-          updateTime: new Date().toISOString(),
+          title: `${topModelName}领跑！AI模型性能榜单 - ${formattedDate}`,
+          updateTime: formatBeijingDateTime(now),
           categories: [] as CategoryData[],
           globalTop10: [] as ModelScore[],
         };
@@ -133,8 +138,9 @@ export class WeixinAIBenchWorkflow extends WorkflowEntrypoint<
           timeout: "5 minutes",
         },
         async () => {
+          const now = getBeijingNow();
           const title = `${topModelName}领跑！${
-            new Date().toLocaleDateString()
+            formatBeijingDate(now)
           } AI模型性能榜单`;
           const imageTitle = `本周大模型排行 ${topModelOrg}旗下大模型登顶`;
           const html = await this.renderer.render(templateData);

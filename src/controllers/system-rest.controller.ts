@@ -4,6 +4,7 @@ import {
   refreshSystemStatus,
   requestSystemRestart,
 } from "@src/services/system.service.ts";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 interface AuthResult {
   authorized: boolean;
@@ -61,7 +62,7 @@ export async function handleGetSystemStatus(req: Request): Promise<Response> {
         code: 200,
         message: "获取系统状态成功",
         data: getSystemStatus(),
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 200,
@@ -75,7 +76,7 @@ export async function handleGetSystemStatus(req: Request): Promise<Response> {
         code: 500,
         message: "获取系统状态失败",
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 500,
@@ -98,7 +99,7 @@ export async function handleRefreshSystem(req: Request): Promise<Response> {
         code: 200,
         message: "系统状态已刷新",
         data: updatedStatus,
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 200,
@@ -112,7 +113,7 @@ export async function handleRefreshSystem(req: Request): Promise<Response> {
         code: 500,
         message: "刷新系统状态失败",
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 500,
@@ -135,7 +136,7 @@ export async function handleRestartSystem(req: Request): Promise<Response> {
         code: 200,
         message: result.message,
         data: result.status,
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 200,
@@ -149,7 +150,7 @@ export async function handleRestartSystem(req: Request): Promise<Response> {
         code: 500,
         message: "重启系统失败",
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 500,

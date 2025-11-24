@@ -1,6 +1,10 @@
 import db from "@src/db/db.ts";
 import { templates } from "@src/db/schema.ts";
 import { eq, desc, and } from "drizzle-orm";
+import {
+  formatBeijingDateTime,
+  getBeijingNow,
+} from "@src/utils/time.util.ts";
 
 export interface TemplateInput {
   name: string;
@@ -32,8 +36,8 @@ function mapTemplate(row: any): TemplateRecord {
     isActive: Boolean(row.isActive),
     style: row.style,
     platform: row.platform,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: formatBeijingDateTime(row.createdAt) ?? undefined,
+    updatedAt: formatBeijingDateTime(row.updatedAt) ?? undefined,
   };
 }
 
@@ -58,8 +62,8 @@ export async function createTemplate(input: TemplateInput): Promise<TemplateReco
     isDefault: input.isDefault ? 1 : 0,
     style: input.style ?? "default",
     platform: input.platform ?? "weixin",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: getBeijingNow(),
+    updatedAt: getBeijingNow(),
   });
 
   if (input.isDefault) {
@@ -75,7 +79,7 @@ export async function updateTemplate(
   input: Partial<TemplateInput>,
 ): Promise<TemplateRecord> {
   const payload: Record<string, unknown> = {
-    updatedAt: new Date().toISOString(),
+    updatedAt: getBeijingNow(),
   };
 
   if (input.name !== undefined) payload.name = input.name;
@@ -121,7 +125,7 @@ async function setDefaultTemplateByType(type: string, idToKeep?: number) {
 
   if (idToKeep) {
     await db.update(templates)
-      .set({ isDefault: 1, updatedAt: new Date().toISOString() })
+      .set({ isDefault: 1, updatedAt: getBeijingNow() })
       .where(and(eq(templates.type, type), eq(templates.id, idToKeep)));
   }
 }

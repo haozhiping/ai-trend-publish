@@ -1,6 +1,7 @@
 import db from "@src/db/db.ts";
 import { publishHistory } from "@src/db/schema.ts";
 import { and, eq, gte, lte, desc, sql, like } from "drizzle-orm";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 export interface PublishHistoryFilter {
   keyword?: string;
@@ -65,7 +66,7 @@ function mapRecord(row: any): PublishHistoryRecord {
     title: row.title,
     platform: row.platform,
     status: row.status,
-    publishTime: row.publishTime,
+    publishTime: formatBeijingDateTime(row.publishTime) ?? "",
     url: row.url,
     articleCount: row.articleCount ?? 0,
     successCount: row.successCount ?? 0,

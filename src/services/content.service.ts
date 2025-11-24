@@ -2,6 +2,7 @@ import db from "@src/db/db.ts";
 import { content } from "@src/db/schema.ts";
 import { desc, eq } from "drizzle-orm";
 import { Logger } from "@zilla/logger";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 const logger = new Logger("ContentService");
 
@@ -57,9 +58,7 @@ export async function getContentList(): Promise<ContentListItem[]> {
     const keywords = parseJsonArray(row.keywords);
     const tags = parseJsonArray(row.tags);
 
-    const publishDate = row.publishDate
-      ? new Date(row.publishDate as unknown as Date).toISOString().replace("T", " ").substring(0, 19)
-      : null;
+    const publishDate = formatBeijingDateTime(row.publishDate);
 
     return {
       id: row.id as number,
@@ -90,9 +89,7 @@ export async function getContentById(id: number): Promise<ContentListItem | null
   const row = rows[0];
   const keywords = parseJsonArray(row.keywords);
   const tags = parseJsonArray(row.tags);
-  const publishDate = row.publishDate
-    ? new Date(row.publishDate as unknown as Date).toISOString().replace("T", " ").substring(0, 19)
-    : null;
+  const publishDate = formatBeijingDateTime(row.publishDate);
 
   return {
     id: row.id as number,

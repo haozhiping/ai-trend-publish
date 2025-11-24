@@ -5,6 +5,7 @@ import {
   WorkflowStep,
 } from "./workflow.ts";
 import { Logger } from "@zilla/logger";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 const logger = new Logger("example-workflow");
 
@@ -93,7 +94,7 @@ export class DataProcessingWorkflow
       ...data,
       processed: true,
       taskType,
-      timestamp: new Date().toISOString(),
+      timestamp: formatBeijingDateTime(new Date()),
     };
   }
 

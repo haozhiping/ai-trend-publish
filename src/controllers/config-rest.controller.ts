@@ -1,5 +1,6 @@
 import { getAllConfigs, updateConfigs } from "@src/services/config.service.ts";
 import { verifyToken } from "@src/utils/auth/jwt.ts";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 /**
  * 获取所有系统配置
@@ -44,7 +45,7 @@ export async function handleGetConfig(req: Request): Promise<Response> {
         code: 200,
         message: "获取配置成功",
         data: configs,
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 200,
@@ -58,7 +59,7 @@ export async function handleGetConfig(req: Request): Promise<Response> {
         code: 500,
         message: "获取配置失败",
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 500,
@@ -112,7 +113,7 @@ export async function handleUpdateConfig(req: Request): Promise<Response> {
         JSON.stringify({
           code: 400,
           message: "配置数据格式错误",
-          timestamp: new Date().toISOString(),
+          timestamp: formatBeijingDateTime(new Date()) ?? undefined,
         }),
         {
           status: 400,
@@ -127,7 +128,7 @@ export async function handleUpdateConfig(req: Request): Promise<Response> {
       JSON.stringify({
         code: 200,
         message: "配置已保存",
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 200,
@@ -141,7 +142,7 @@ export async function handleUpdateConfig(req: Request): Promise<Response> {
         code: 500,
         message: "更新配置失败",
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       }),
       {
         status: 500,

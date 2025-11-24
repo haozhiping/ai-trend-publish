@@ -5,6 +5,7 @@ import {
   updateContentById,
 } from "@src/services/content.service.ts";
 import { extractTokenFromHeader, verifyToken } from "@src/utils/auth/jwt.ts";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 interface ApiResponse<T = any> {
   code: number;
@@ -18,7 +19,7 @@ function successResponse<T>(data: T, message = "操作成功"): ApiResponse<T> {
     code: 200,
     message,
     data,
-    timestamp: new Date().toISOString(),
+    timestamp: formatBeijingDateTime(new Date()) ?? undefined,
   };
 }
 
@@ -26,7 +27,7 @@ function errorResponse(message: string, code = 400): ApiResponse {
   return {
     code,
     message,
-    timestamp: new Date().toISOString(),
+    timestamp: formatBeijingDateTime(new Date()) ?? undefined,
   };
 }
 

@@ -1,5 +1,6 @@
 import { ConfigManager } from "@src/utils/config/config-manager.ts";
 import { Logger } from "@zilla/logger";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 const logger = new Logger("http-client");
 
@@ -165,7 +166,7 @@ export class HttpClient {
           ? error
           : new HttpError((error as Error).message),
         url,
-        timestamp: new Date().toISOString(),
+        timestamp: formatBeijingDateTime(new Date()) ?? undefined,
       });
       return false;
     }

@@ -5,6 +5,10 @@ import { WorkflowType, getWorkflow } from "@src/controllers/cron.ts";
 import { Logger } from "@zilla/logger";
 import cron from "npm:node-cron";
 import { persistWorkflowResult } from "@src/services/workflow-record.service.ts";
+import {
+  formatBeijingDateTime,
+  getBeijingNow,
+} from "@src/utils/time.util.ts";
 
 const logger = new Logger("WorkflowService");
 
@@ -40,13 +44,13 @@ export async function getWorkflows() {
     status: workflowStatus.get(wf.id) || (wf.status as "running" | "stopped"),
     schedule: wf.schedule,
     config: wf.config,
-    lastRun: wf.lastRun,
-    nextRun: wf.nextRun,
+    lastRun: formatBeijingDateTime(wf.lastRun),
+    nextRun: formatBeijingDateTime(wf.nextRun),
     runCount: wf.runCount,
     successCount: wf.successCount,
     failCount: wf.failCount,
-    createdAt: wf.createdAt,
-    updatedAt: wf.updatedAt,
+    createdAt: formatBeijingDateTime(wf.createdAt),
+    updatedAt: formatBeijingDateTime(wf.updatedAt),
   }));
 }
 
@@ -71,13 +75,13 @@ export async function getWorkflowById(id: number) {
     status: workflowStatus.get(wf.id) || (wf.status as "running" | "stopped"),
     schedule: wf.schedule,
     config: wf.config,
-    lastRun: wf.lastRun,
-    nextRun: wf.nextRun,
+    lastRun: formatBeijingDateTime(wf.lastRun),
+    nextRun: formatBeijingDateTime(wf.nextRun),
     runCount: wf.runCount,
     successCount: wf.successCount,
     failCount: wf.failCount,
-    createdAt: wf.createdAt,
-    updatedAt: wf.updatedAt,
+    createdAt: formatBeijingDateTime(wf.createdAt),
+    updatedAt: formatBeijingDateTime(wf.updatedAt),
   };
 }
 
@@ -96,6 +100,8 @@ export async function createWorkflow(data: WorkflowCreateRequest, userId?: numbe
     schedule: data.schedule || null,
     config: data.config || null,
     createdBy: userId || null,
+    createdAt: getBeijingNow(),
+    updatedAt: getBeijingNow(),
   });
 
   const [latestWorkflow] = await db
@@ -121,7 +127,9 @@ export async function createWorkflow(data: WorkflowCreateRequest, userId?: numbe
 
 // 更新工作流
 export async function updateWorkflow(id: number, data: WorkflowUpdateRequest) {
-  const updateData: any = {};
+  const updateData: any = {
+    updatedAt: getBeijingNow(),
+  };
   
   if (data.name !== undefined) updateData.name = data.name;
   if (data.description !== undefined) updateData.description = data.description;
@@ -173,7 +181,7 @@ export async function startWorkflow(id: number) {
 
   await db
     .update(workflows)
-    .set({ status: "running" })
+    .set({ status: "running", updatedAt: getBeijingNow() })
     .where(eq(workflows.id, id));
 
   workflowStatus.set(id, "running");
@@ -188,7 +196,7 @@ export async function stopWorkflow(id: number) {
   
   await db
     .update(workflows)
-    .set({ status: "stopped" })
+    .set({ status: "stopped", updatedAt: getBeijingNow() })
     .where(eq(workflows.id, id));
 
   workflowStatus.set(id, "stopped");
@@ -210,8 +218,9 @@ export async function executeWorkflow(id: number) {
   await db
     .update(workflows)
     .set({
-      lastRun: new Date(),
+      lastRun: getBeijingNow(),
       runCount: (workflow.runCount || 0) + 1,
+      updatedAt: getBeijingNow(),
     })
     .where(eq(workflows.id, id));
 
@@ -225,7 +234,10 @@ export async function executeWorkflow(id: number) {
 
   execution.then(async () => {
     await db.update(workflows)
-      .set({ successCount: (workflow.successCount || 0) + 1 })
+      .set({
+        successCount: (workflow.successCount || 0) + 1,
+        updatedAt: getBeijingNow(),
+      })
       .where(eq(workflows.id, id));
 
     await persistWorkflowResult(
@@ -235,7 +247,10 @@ export async function executeWorkflow(id: number) {
     logger.info(`工作流执行成功: ${id}`);
   }).catch(async (error) => {
     await db.update(workflows)
-      .set({ failCount: (workflow.failCount || 0) + 1 })
+      .set({
+        failCount: (workflow.failCount || 0) + 1,
+        updatedAt: getBeijingNow(),
+      })
       .where(eq(workflows.id, id));
 
     await persistWorkflowResult(

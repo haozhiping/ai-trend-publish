@@ -7,6 +7,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { WorkflowRunResult } from "@src/works/workflow-recorder.ts";
 import { Logger } from "@zilla/logger";
+import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
 const logger = new Logger("WorkflowRecordService");
 
@@ -111,7 +112,7 @@ function buildLogMetadata(result: WorkflowRunResult, limit = 30) {
   const logs = result.logs
     .slice(-limit)
     .map((log) =>
-      `[${new Date(log.timestamp).toLocaleString()}][${
+      `[${formatBeijingDateTime(log.timestamp)}][${
         log.level.toUpperCase()
       }] ${log.module} :: ${log.message}${
         log.details ? ` ${JSON.stringify(log.details)}` : ""
@@ -134,6 +135,13 @@ async function savePublishHistory(
         ? (record.failCount ?? articleCount - computedSuccess)
         : Math.max(articleCount - computedSuccess, 0);
       const logMetadata = buildLogMetadata(result);
+      const detailedLogs = result.logs.slice(-200).map((log) => ({
+        timestamp: formatBeijingDateTime(log.timestamp),
+        level: log.level,
+        module: log.module,
+        message: log.message,
+        details: log.details ?? null,
+      }));
 
       const publishTime = normalizeDate(
         record.publishTime ?? result.finishedAt ?? Date.now(),
@@ -154,6 +162,7 @@ async function savePublishHistory(
         metadata: {
           ...record.metadata,
           logs: logMetadata,
+          rawLogs: detailedLogs,
         },
         createdAt: new Date(),
       });
