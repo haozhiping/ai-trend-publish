@@ -29,16 +29,40 @@ export class OpenAICompatibleEmbedding implements EmbeddingProvider {
   }
 
   async refresh(): Promise<void> {
-    // 获取基础配置
-    this.baseURL = await this.configManager.get(`${this.configKeyPrefix}EMBEDDING_BASE_URL`);
-    this.apiKey = await this.configManager.get(`${this.configKeyPrefix}EMBEDDING_API_KEY`);
+    const baseUrlKey = `${this.configKeyPrefix}EMBEDDING_BASE_URL`;
+    const apiKeyKey = `${this.configKeyPrefix}EMBEDDING_API_KEY`;
+    const modelKey = `${this.configKeyPrefix}EMBEDDING_MODEL`;
 
-    logger.info(`${this.configKeyPrefix}EMBEDDING_API_KEY`)
+    const isDashscope = this.configKeyPrefix === "DASHSCOPE_";
 
-    logger.info("dashscope",this.apiKey)
+    const resolveValue = async (
+      primaryKey: string,
+      fallbacks: string[] = [],
+    ) => {
+      for (const key of [primaryKey, ...fallbacks]) {
+        const value = await this.configManager.get<string>(key).catch(() =>
+          undefined
+        );
+        if (value) return value;
+      }
+      throw new Error(
+        `缺少必要配置: ${primaryKey}${fallbacks.length ? ` (fallback: ${fallbacks.join(", ")})` : ""}`,
+      );
+    };
 
-    // 获取模型配置，支持多模型格式 "model1|model2|model3"
-    const modelConfig = await this.configManager.get(`${this.configKeyPrefix}EMBEDDING_MODEL`);
+    this.baseURL = await resolveValue(
+      baseUrlKey,
+      isDashscope ? ["QWEN_BASE_URL"] : [],
+    );
+    this.apiKey = await resolveValue(
+      apiKeyKey,
+      isDashscope ? ["DASHSCOPE_API_KEY", "QWEN_API_KEY"] : [],
+    );
+
+    const modelConfig = await resolveValue(
+      modelKey,
+      isDashscope ? ["QWEN_MODEL"] : [],
+    );
     
     this.availableModels = (modelConfig as string).split("|").map(model => model.trim());
 

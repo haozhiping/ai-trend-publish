@@ -66,6 +66,9 @@ export class WeixinHelloGithubWorkflow extends WorkflowEntrypoint<
       logger.info(
         `[工作流开始] 开始执行HelloGithub数据处理, 当前工作流实例ID: ${this.env.id} 触发事件ID: ${event.id}`,
       );
+      this.recordLog("info", this.env.id, "HelloGithub 工作流开始", {
+        eventId: event.id,
+      });
       await this.notify.info("工作流开始", "开始执行HelloGithub数据处理");
 
       // 1. 获取热门项目数据
@@ -191,6 +194,17 @@ export class WeixinHelloGithubWorkflow extends WorkflowEntrypoint<
         const html = await this.renderer.render(items);
         return { title, htmlContent: html };
       });
+      this.recordContent({
+        title,
+        content: htmlContent,
+        summary: "HelloGithub 热门项目精选",
+        source: "hellogithub",
+        platform: "weixin",
+        status: "generated",
+        metadata: {
+          items: items.slice(0, 5).map((item) => item.name),
+        },
+      });
 
       // 5. 发布文章
       const publishResult = await step.do("publish-article", {
@@ -209,6 +223,23 @@ export class WeixinHelloGithubWorkflow extends WorkflowEntrypoint<
       // 6. 完成报告
       logger.info("[工作流] 工作流执行完成");
       logger.info("[发布] 发布结果:", publishResult);
+      this.recordPublish({
+        title,
+        platform: publishResult.platform,
+        status: publishResult.status,
+        publishTime: publishResult.publishedAt ?? new Date(),
+        url: publishResult.url ?? null,
+        articleCount: items.length,
+        successCount: items.length,
+        failCount: 0,
+        metadata: {
+          publishId: publishResult.publishId,
+        },
+      });
+      this.recordLog("info", this.env.id, "HelloGithub 发布成功", {
+        publishId: publishResult.publishId,
+        projectCount: items.length,
+      });
       await this.notify.success(
         "HelloGithub更新完成",
         `已生成并发布最新的GitHub热门项目榜单\n发布状态: ${publishResult.status}`,
@@ -223,6 +254,9 @@ export class WeixinHelloGithubWorkflow extends WorkflowEntrypoint<
       }
 
       logger.error("[工作流] 执行失败:", message);
+      this.recordLog("error", this.env.id, "HelloGithub 工作流失败", {
+        error: message,
+      });
       await this.notify.error("工作流失败", message);
       throw error;
     }

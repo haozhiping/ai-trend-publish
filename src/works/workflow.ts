@@ -1,5 +1,12 @@
 import { Logger } from "@zilla/logger";
 import { MetricsCollector } from "@src/works/metrics.ts";
+import {
+  RecordedContent,
+  RecordedPublish,
+  WorkflowRecorder,
+  WorkflowRunResult,
+  WorkflowLogLevel,
+} from "@src/works/workflow-recorder.ts";
 import { RetryOptions, RetryUtil } from "@src/utils/retry.util.ts";
 import { WorkflowStepError, WorkflowTerminateError } from "./workflow-error.ts";
 
@@ -179,14 +186,43 @@ export interface WorkflowEnv<TEnv = any> {
 export abstract class WorkflowEntrypoint<TEnv = any, TParams = any> {
   protected env: WorkflowEnv<TEnv>;
   protected metricsCollector: MetricsCollector;
+  private recorder?: WorkflowRecorder;
+  private lastRunResult?: WorkflowRunResult;
 
   constructor(env: WorkflowEnv<TEnv>) {
     this.env = env;
     this.metricsCollector = new MetricsCollector();
   }
 
-  async execute(event: WorkflowEvent<TParams>): Promise<void> {
+  getLastRunResult(): WorkflowRunResult | undefined {
+    return this.lastRunResult;
+  }
+
+  protected recordContent(content: RecordedContent) {
+    this.ensureRecorder().addContent(content);
+  }
+
+  protected recordPublish(record: RecordedPublish) {
+    this.ensureRecorder().addPublish(record);
+  }
+
+  protected recordLog(
+    level: WorkflowLogLevel,
+    module: string,
+    message: string,
+    details?: Record<string, unknown> | string,
+  ) {
+    this.ensureRecorder().addLog({
+      level,
+      module,
+      message,
+      details: typeof details === "string" ? { message: details } : details,
+    });
+  }
+
+  async execute(event: WorkflowEvent<TParams>): Promise<WorkflowRunResult> {
     this.metricsCollector.startWorkflow(this.env.id, event.id);
+    this.recorder = new WorkflowRecorder(this.env.id, event.id);
     const step = new WorkflowStep(
       "local-step-execution",
       this.metricsCollector,
@@ -197,10 +233,14 @@ export abstract class WorkflowEntrypoint<TEnv = any, TParams = any> {
     try {
       await this.run(event, step);
       this.metricsCollector.endWorkflow(this.env.id, event.id);
+      this.lastRunResult = this.ensureRecorder().finalize();
+      return this.lastRunResult;
     } catch (error: any) {
-      // 区分终止错误和其他错误
       const isTerminated = error instanceof WorkflowTerminateError;
       this.metricsCollector.endWorkflow(this.env.id, event.id, error);
+      const recorder = this.ensureRecorder();
+      recorder.setFailure(error?.message ?? "unknown error");
+      this.lastRunResult = recorder.finalize();
 
       if (isTerminated) {
         logger.warn(`Workflow terminated: ${error.message}`);
@@ -209,6 +249,8 @@ export abstract class WorkflowEntrypoint<TEnv = any, TParams = any> {
       }
 
       throw error;
+    } finally {
+      this.recorder = undefined;
     }
   }
 
@@ -216,4 +258,11 @@ export abstract class WorkflowEntrypoint<TEnv = any, TParams = any> {
     event: WorkflowEvent<TParams>,
     step: WorkflowStep,
   ): Promise<void>;
+
+  private ensureRecorder(): WorkflowRecorder {
+    if (!this.recorder) {
+      throw new Error("Workflow recorder is not initialized");
+    }
+    return this.recorder;
+  }
 }

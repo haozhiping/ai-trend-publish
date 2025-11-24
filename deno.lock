@@ -37,6 +37,7 @@
     "npm:openai@*": "4.87.3_zod@3.23.8",
     "npm:path@*": "0.12.7",
     "npm:shiki@^1.22.2": "1.29.2",
+    "npm:systeminformation@*": "5.27.11",
     "npm:zod@*": "3.24.2",
     "npm:zod@3.23.8": "3.23.8"
   },
@@ -1426,6 +1427,12 @@
         "has-flag"
       ],
       "tarball": "https://registry.npmmirror.com/supports-color/-/supports-color-7.2.0.tgz"
+    },
+    "systeminformation@5.27.11": {
+      "integrity": "sha512-K3Lto/2m3K2twmKHdgx5B+0in9qhXK4YnoT9rIlgwN/4v7OV5c8IjbeAUkuky/6VzCQC7iKCAqi8rZathCdjHg==",
+      "os": ["darwin", "linux", "win32", "freebsd", "openbsd", "netbsd", "sunos", "android"],
+      "bin": true,
+      "tarball": "https://registry.npmmirror.com/systeminformation/-/systeminformation-5.27.11.tgz"
     },
     "tr46@0.0.3": {
       "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",

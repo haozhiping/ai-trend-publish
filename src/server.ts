@@ -12,7 +12,12 @@ import {
   handleStopWorkflow,
   handleExecuteWorkflow,
 } from "./controllers/workflow-rest.controller.ts";
-import { handleGetContents, handleGetContent, handleDeleteContent } from "./controllers/content-rest.controller.ts";
+import {
+  handleGetContents,
+  handleGetContent,
+  handleDeleteContent,
+  handleUpdateContent,
+} from "./controllers/content-rest.controller.ts";
 import {
   handleGetConfig,
   handleUpdateConfig,
@@ -22,6 +27,37 @@ import {
   handleRefreshSystem,
   handleRestartSystem,
 } from "./controllers/system-rest.controller.ts";
+import {
+  handleGetTemplates,
+  handleCreateTemplate,
+  handleUpdateTemplate,
+  handleDeleteTemplate,
+  handleSetDefaultTemplate,
+} from "./controllers/template.controller.ts";
+import {
+  handleGetDataSources,
+  handleCreateDataSource,
+  handleUpdateDataSource,
+  handleDeleteDataSource,
+  handleTestDataSource,
+  handleSyncDataSource,
+  handleToggleDataSource,
+} from "./controllers/data-source.controller.ts";
+import { handleGetPublishHistory } from "./controllers/publish-history.controller.ts";
+import {
+  handleClearSystemLogs,
+  handleExportSystemLogs,
+  handleGetSystemLogs,
+} from "./controllers/system-log.controller.ts";
+import {
+  handleCreateAnnouncement,
+  handleDeleteAnnouncement,
+  handleGetAnnouncements,
+  handlePublishAnnouncement,
+  handleUnpublishAnnouncement,
+  handleUpdateAnnouncement,
+} from "./controllers/announcement.controller.ts";
+import { handleGetDashboardOverview } from "./controllers/dashboard.controller.ts";
 import { initializeWorkflows } from "./services/workflow.service.ts";
 
 
@@ -228,6 +264,57 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
     }
   }
 
+  // 模板接口
+  if (pathParts[0] === "api" && pathParts[1] === "templates") {
+    if (method === "GET" && pathParts.length === 2) {
+      return await handleGetTemplates(req);
+    }
+    if (method === "POST" && pathParts.length === 2) {
+      return await handleCreateTemplate(req);
+    }
+    if (method === "PUT" && pathParts.length === 3) {
+      return await handleUpdateTemplate(req, pathParts[2]);
+    }
+    if (method === "DELETE" && pathParts.length === 3) {
+      return await handleDeleteTemplate(req, pathParts[2]);
+    }
+    if (method === "POST" && pathParts.length === 4 && pathParts[3] === "default") {
+      return await handleSetDefaultTemplate(req, pathParts[2]);
+    }
+  }
+
+  // 数据源接口
+  if (pathParts[0] === "api" && pathParts[1] === "datasources") {
+    if (method === "GET" && pathParts.length === 2) {
+      return await handleGetDataSources(req);
+    }
+    if (method === "POST" && pathParts.length === 2) {
+      return await handleCreateDataSource(req);
+    }
+    if (method === "PUT" && pathParts.length === 3) {
+      return await handleUpdateDataSource(req, pathParts[2]);
+    }
+    if (method === "DELETE" && pathParts.length === 3) {
+      return await handleDeleteDataSource(req, pathParts[2]);
+    }
+    if (method === "POST" && pathParts.length === 4) {
+      if (pathParts[3] === "test") {
+        return await handleTestDataSource(req, pathParts[2]);
+      }
+      if (pathParts[3] === "sync") {
+        return await handleSyncDataSource(req, pathParts[2]);
+      }
+      if (pathParts[3] === "toggle") {
+        return await handleToggleDataSource(req, pathParts[2]);
+      }
+    }
+  }
+
+  // 发布历史
+  if (pathParts[0] === "api" && pathParts[1] === "publish-history" && method === "GET") {
+    return await handleGetPublishHistory(req);
+  }
+
   // 系统控制接口
   if (pathParts[0] === "api" && pathParts[1] === "system") {
     if (method === "GET" && pathParts.length === 3 && pathParts[2] === "status") {
@@ -238,6 +325,47 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
     }
     if (method === "POST" && pathParts.length === 3 && pathParts[2] === "restart") {
       return await handleRestartSystem(req);
+    }
+    if (pathParts.length >= 3 && pathParts[2] === "logs") {
+      if (method === "GET" && pathParts.length === 3) {
+        return await handleGetSystemLogs(req);
+      }
+      if (method === "GET" && pathParts.length === 4 && pathParts[3] === "export") {
+        return await handleExportSystemLogs(req);
+      }
+      if (method === "POST" && pathParts.length === 4 && pathParts[3] === "clear") {
+        return await handleClearSystemLogs(req);
+      }
+    }
+  }
+
+  // 公告接口
+  if (pathParts[0] === "api" && pathParts[1] === "announcements") {
+    if (method === "GET" && pathParts.length === 2) {
+      return await handleGetAnnouncements(req);
+    }
+    if (method === "POST" && pathParts.length === 2) {
+      return await handleCreateAnnouncement(req);
+    }
+    if (method === "PUT" && pathParts.length === 3) {
+      return await handleUpdateAnnouncement(req, pathParts[2]);
+    }
+    if (method === "DELETE" && pathParts.length === 3) {
+      return await handleDeleteAnnouncement(req, pathParts[2]);
+    }
+    if (method === "POST" && pathParts.length === 4) {
+      if (pathParts[3] === "publish") {
+        return await handlePublishAnnouncement(req, pathParts[2]);
+      }
+      if (pathParts[3] === "unpublish") {
+        return await handleUnpublishAnnouncement(req, pathParts[2]);
+      }
+    }
+  }
+
+  if (pathParts[0] === "api" && pathParts[1] === "dashboard" && pathParts[2] === "overview") {
+    if (method === "GET") {
+      return await handleGetDashboardOverview(req);
     }
   }
 

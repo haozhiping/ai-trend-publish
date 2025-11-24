@@ -38,9 +38,20 @@ export abstract class BaseAliyunImageGenerator extends BaseImageGenerator {
    * 从配置管理器中获取最新的API密钥
    */
   async refresh(): Promise<void> {
-    const apiKey = await this.configManager.get<string>("DASHSCOPE_API_KEY");
+    let apiKey: string | undefined;
+    try {
+      apiKey = await this.configManager.get<string>("DASHSCOPE_API_KEY");
+    } catch {
+      // 兼容新版百炼仅提供 QWEN_API_KEY 的情况
+      apiKey = await this.configManager.get<string>("QWEN_API_KEY").catch(
+        () => undefined,
+      );
+    }
+
     if (!apiKey) {
-      throw new Error("DASHSCOPE_API_KEY environment variable is not set");
+      throw new Error(
+        "未找到 DASHSCOPE_API_KEY 或 QWEN_API_KEY，请在 .env 或系统配置中提供任一值",
+      );
     }
     this.apiKey = apiKey;
   }

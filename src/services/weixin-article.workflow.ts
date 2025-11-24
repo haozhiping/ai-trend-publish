@@ -30,9 +30,6 @@ import { EmbeddingProvider } from "@src/providers/interfaces/embedding.interface
 import { EmbeddingFactory } from "@src/providers/embedding/embedding-factory.ts";
 import { EmbeddingProviderType } from "@src/providers/interfaces/embedding.interface.ts";
 import { VectorSimilarityUtil } from "@src/utils/VectorSimilarityUtil.ts";
-import db from "@src/db/db.ts";
-import { content } from "@src/db/schema.ts";
-import { eq } from "drizzle-orm";
 const logger = new Logger("weixin-article-workflow");
 
 interface WeixinWorkflowEnv {
@@ -89,6 +86,9 @@ export class WeixinArticleWorkflow
       logger.info(
         `[工作流开始] 开始执行微信工作流, 当前工作流实例ID: ${this.env.id} 触发事件ID: ${event.id}`,
       );
+      this.recordLog("info", this.env.id, "工作流开始执行", {
+        eventId: event.id,
+      });
 
       // 验证IP白名单
       await step.do("validate-ip-whitelist", {
@@ -373,74 +373,35 @@ export class WeixinArticleWorkflow
         return topContents;
       });
 
-      // 6.5. 保存内容到内容库
-      await step.do("save-contents", {
-        retries: { limit: 2, delay: "5 second", backoff: "exponential" },
-        timeout: "5 minutes",
-      }, async () => {
-        logger.info(`[内容保存] 开始保存 ${processedContents.length} 条内容到内容库`);
-        
-        // 辅助函数：从 URL 推断 source
-        const inferSource = (url: string, metadataSource?: string): string => {
-          if (metadataSource) return metadataSource.toLowerCase();
-          if (url.includes("twitter.com") || url.includes("x.com")) return "twitter";
-          if (url.includes("github.com")) return "hellogithub";
-          return "firecrawl";
-        };
-        
-        for (const scrapedContent of processedContents) {
-          try {
-            const inferredSource = inferSource(
-              scrapedContent.url,
-              scrapedContent.metadata.source
-            );
-            
-            // 检查是否已存在（根据 URL）
-            const existing = await db
-              .select()
-              .from(content)
-              .where(eq(content.url, scrapedContent.url))
-              .limit(1);
+      const inferSource = (url: string, metadataSource?: string): string => {
+        if (metadataSource) return metadataSource.toLowerCase();
+        if (!url) return "firecrawl";
+        if (url.includes("twitter.com") || url.includes("x.com")) return "twitter";
+        if (url.includes("github.com")) return "hellogithub";
+        return "firecrawl";
+      };
 
-            if (existing.length > 0) {
-              // 更新已存在的内容
-              await db
-                .update(content)
-                .set({
-                  title: scrapedContent.title,
-                  content: scrapedContent.content,
-                  summary: scrapedContent.metadata.summary || null,
-                  score: scrapedContent.metadata.score || null,
-                  keywords: scrapedContent.metadata.keywords ? JSON.stringify(scrapedContent.metadata.keywords) : null,
-                  status: "published",
-                  publishDate: scrapedContent.publishDate ? new Date(scrapedContent.publishDate) : null,
-                  updatedAt: new Date().toISOString(),
-                })
-                .where(eq(content.id, existing[0].id));
-              logger.debug(`[内容保存] 更新内容: ${scrapedContent.title}`);
-            } else {
-              // 插入新内容
-              await db.insert(content).values({
-                title: scrapedContent.title,
-                content: scrapedContent.content,
-                summary: scrapedContent.metadata.summary || null,
-                url: scrapedContent.url,
-                source: inferredSource,
-                platform: "weixin",
-                score: scrapedContent.metadata.score || null,
-                keywords: scrapedContent.metadata.keywords ? JSON.stringify(scrapedContent.metadata.keywords) : null,
-                status: "published",
-                publishDate: scrapedContent.publishDate ? new Date(scrapedContent.publishDate) : null,
-              });
-              logger.debug(`[内容保存] 新增内容: ${scrapedContent.title} (来源: ${inferredSource})`);
-            }
-          } catch (error) {
-            logger.error(`[内容保存] 保存内容失败: ${scrapedContent.title}`, error);
-            // 继续处理下一条，不中断整个流程
-          }
-        }
-        
-        logger.info("[内容保存] 内容保存完成");
+      processedContents.forEach((scrapedContent) => {
+        this.recordContent({
+          title: scrapedContent.title || "未命名内容",
+          content: scrapedContent.content,
+          summary: scrapedContent.metadata.summary || null,
+          url: scrapedContent.url,
+          source: inferSource(
+            scrapedContent.url,
+            scrapedContent.metadata.source,
+          ),
+          platform: "weixin",
+          score: scrapedContent.metadata.score || null,
+          keywords: scrapedContent.metadata.keywords || [],
+          status: "processed",
+          publishDate: scrapedContent.publishDate || null,
+          metadata: {
+            keywords: scrapedContent.metadata.keywords,
+            tags: scrapedContent.metadata.tags,
+            sourceType: scrapedContent.metadata.source,
+          },
+        });
       });
 
       // 7. 生成文章
@@ -501,7 +462,7 @@ export class WeixinArticleWorkflow
       );
 
       // 8. 发布文章
-      await step.do("publish-article", {
+      const publishResult = await step.do("publish-article", {
         retries: { limit: 3, delay: "10 second", backoff: "exponential" },
         timeout: "5 minutes",
       }, async () => {
@@ -512,6 +473,24 @@ export class WeixinArticleWorkflow
           summaryTitle,
           mediaId,
         );
+      });
+
+      this.recordPublish({
+        title: summaryTitle,
+        platform: publishResult.platform,
+        status: publishResult.status,
+        publishTime: publishResult.publishedAt ?? new Date(),
+        url: publishResult.url ?? null,
+        articleCount: processedContents.length,
+        successCount: processedContents.length,
+        failCount: 0,
+        metadata: {
+          publishId: publishResult.publishId,
+        },
+      });
+      this.recordLog("info", this.env.id, "发布完成", {
+        publishId: publishResult.publishId,
+        articleCount: processedContents.length,
       });
 
       // 9. 完成报告
@@ -541,6 +520,9 @@ export class WeixinArticleWorkflow
       }
 
       logger.error("[工作流] 执行失败:", message);
+      this.recordLog("error", this.env.id, "工作流执行失败", {
+        error: message,
+      });
       await this.notifier.error("工作流失败", message);
       throw error;
     }

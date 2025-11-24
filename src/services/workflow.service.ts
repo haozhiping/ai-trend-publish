@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { WorkflowType, getWorkflow } from "@src/controllers/cron.ts";
 import { Logger } from "@zilla/logger";
 import cron from "npm:node-cron";
+import { persistWorkflowResult } from "@src/services/workflow-record.service.ts";
 
 const logger = new Logger("WorkflowService");
 
@@ -216,21 +217,31 @@ export async function executeWorkflow(id: number) {
 
   // 执行工作流（异步，不等待完成）
   const workflowInstance = getWorkflow(workflow.type as WorkflowType);
-  workflowInstance.execute({
+  const execution = workflowInstance.execute({
     payload: workflow.config || {},
     id: `manual-${id}-${Date.now()}`,
     timestamp: Date.now(),
-  }).then(() => {
-    // 执行成功
-    db.update(workflows)
+  });
+
+  execution.then(async () => {
+    await db.update(workflows)
       .set({ successCount: (workflow.successCount || 0) + 1 })
       .where(eq(workflows.id, id));
+
+    await persistWorkflowResult(
+      { id: workflow.id, type: workflow.type, name: workflow.name },
+      workflowInstance.getLastRunResult(),
+    );
     logger.info(`工作流执行成功: ${id}`);
-  }).catch((error) => {
-    // 执行失败
-    db.update(workflows)
+  }).catch(async (error) => {
+    await db.update(workflows)
       .set({ failCount: (workflow.failCount || 0) + 1 })
       .where(eq(workflows.id, id));
+
+    await persistWorkflowResult(
+      { id: workflow.id, type: workflow.type, name: workflow.name },
+      workflowInstance.getLastRunResult(),
+    );
     logger.error(`工作流执行失败: ${id}`, error);
   });
 

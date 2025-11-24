@@ -9,21 +9,49 @@ interface SystemStatus {
   status: "running" | "maintenance" | "restarting";
 }
 
+const serverStartTime = new Date();
+const defaultVersion = Deno.env.get("APP_VERSION") ?? "v1.2.3";
+
+function formatUptime(from: Date): string {
+  const diffMs = Date.now() - from.getTime();
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  return `${days}天${hours}小时${minutes}分钟`;
+}
+
+function formatBeijingTime(date = new Date()): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 let systemStatus: SystemStatus = {
-  uptime: "2天14小时32分",
-  version: "v1.2.3",
-  lastUpdate: new Date().toISOString(),
+  uptime: "0天0小时0分钟",
+  version: defaultVersion,
+  lastUpdate: formatBeijingTime(),
   status: "running",
 };
 
 export function getSystemStatus(): SystemStatus {
-  return { ...systemStatus };
+  return {
+    ...systemStatus,
+    uptime: formatUptime(serverStartTime),
+  };
 }
 
 export function refreshSystemStatus(): SystemStatus {
   systemStatus = {
     ...systemStatus,
-    lastUpdate: new Date().toISOString(),
+    lastUpdate: formatBeijingTime(),
     status: systemStatus.status === "running" ? "running" : "maintenance",
   };
   logger.info("系统状态刷新");
@@ -33,8 +61,7 @@ export function refreshSystemStatus(): SystemStatus {
 export function requestSystemRestart(): { message: string; status: SystemStatus } {
   systemStatus = {
     ...systemStatus,
-    uptime: "0天0小时0分钟",
-    lastUpdate: new Date().toISOString(),
+    lastUpdate: formatBeijingTime(),
     status: "restarting",
   };
   logger.info("收到重启请求，正在执行重启...");

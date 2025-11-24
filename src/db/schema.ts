@@ -12,10 +12,22 @@ export const config = mysqlTable("config", {
 
 export const dataSources = mysqlTable("data_sources", {
 	id: int().autoincrement().notNull(),
+	name: varchar({ length: 255 }).notNull(),
+	type: varchar({ length: 50 }).notNull(),
 	platform: varchar({ length: 255 }),
 	identifier: varchar({ length: 255 }),
+	url: varchar({ length: 1000 }),
+	enabled: tinyint().default(1).notNull(),
+	status: varchar({ length: 20 }).default("active").notNull(),
+	description: text(),
+	config: json(),
+	lastSyncAt: timestamp("last_sync_at", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
 },
 (table) => [
+	index("idx_data_source_type").on(table.type),
+	index("idx_data_source_status").on(table.status),
 	primaryKey({ columns: [table.id], name: "data_sources_id"}),
 ]);
 
@@ -50,15 +62,19 @@ export const templates = mysqlTable("templates", {
 	description: text(),
 	platform: varchar({ length: 50 }).notNull(),
 	style: varchar({ length: 50 }).notNull(),
+	type: varchar({ length: 50 }).default("article").notNull(),
 	content: text().notNull(),
 	schema: json(),
 	exampleData: json("example_data"),
 	isActive: tinyint("is_active").default(1),
+	isDefault: tinyint("is_default").default(0),
+	previewUrl: varchar("preview_url", { length: 1000 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
 	createdBy: int("created_by"),
 },
 (table) => [
+	index("idx_templates_type").on(table.type),
 	primaryKey({ columns: [table.id], name: "templates_id"}),
 ]);
 
@@ -74,8 +90,12 @@ export const content = mysqlTable("content", {
 	score: double("score"),
 	keywords: json(),
 	tags: json(),
+	metadata: json(),
 	status: varchar({ length: 20 }).default("draft").notNull(),
 	publishDate: timestamp("publish_date", { mode: "date" }),
+	workflowId: int("workflow_id"),
+	workflowType: varchar("workflow_type", { length: 50 }),
+	workflowEventId: varchar("workflow_event_id", { length: 100 }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
 },
@@ -84,6 +104,7 @@ export const content = mysqlTable("content", {
 	index("idx_source").on(table.source),
 	index("idx_status").on(table.status),
 	index("idx_publish_date").on(table.publishDate),
+	index("idx_content_workflow").on(table.workflowId),
 ]);
 
 export const vectorItems = mysqlTable("vector_items", {
@@ -152,6 +173,7 @@ export const publishHistory = mysqlTable("publish_history", {
 	failCount: int("fail_count").default(0),
 	workflowType: varchar("workflow_type", { length: 50 }),
 	workflowId: int("workflow_id"),
+	eventId: varchar("event_id", { length: 100 }),
 	errorMessage: text("error_message"),
 	metadata: json(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
@@ -162,4 +184,45 @@ export const publishHistory = mysqlTable("publish_history", {
 	index("idx_status").on(table.status),
 	index("idx_publish_time").on(table.publishTime),
 	index("idx_workflow_type").on(table.workflowType),
+]);
+
+export const systemLogs = mysqlTable("system_logs", {
+	id: bigint({ mode: "number" }).autoincrement().notNull(),
+	level: varchar({ length: 10 }).notNull(),
+	module: varchar({ length: 100 }).notNull(),
+	message: text().notNull(),
+	details: json(),
+	workflowId: int("workflow_id"),
+	workflowType: varchar("workflow_type", { length: 50 }),
+	eventId: varchar("event_id", { length: 100 }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+},
+(table) => [
+	index("idx_log_level").on(table.level),
+	index("idx_log_module").on(table.module),
+	index("idx_log_workflow").on(table.workflowId),
+	primaryKey({ columns: [table.id], name: "system_logs_id"}),
+]);
+
+export const announcements = mysqlTable("announcements", {
+	id: int().autoincrement().notNull(),
+	title: varchar({ length: 255 }).notNull(),
+	content: text().notNull(),
+	target: varchar({ length: 50 }).default("all").notNull(),
+	status: varchar({ length: 20 }).default("draft").notNull(),
+	priority: varchar({ length: 20 }).default("normal").notNull(),
+	publishTime: timestamp("publish_time", { mode: 'string' }),
+	level: varchar({ length: 20 }).default("info").notNull(),
+	readCount: int("read_count").default(0),
+	creatorId: int("creator_id"),
+	creatorName: varchar("creator_name", { length: 100 }),
+	attachments: json(),
+	metadata: json(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().onUpdateNow().notNull(),
+},
+(table) => [
+	index("idx_announcement_status").on(table.status),
+	index("idx_announcement_priority").on(table.priority),
+	primaryKey({ columns: [table.id], name: "announcements_id"}),
 ]);

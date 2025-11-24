@@ -1,6 +1,16 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { config, dataSources, vectorItems, users, workflows, publishHistory, content } from "@src/db/schema.ts";
+import {
+  config,
+  dataSources,
+  vectorItems,
+  users,
+  workflows,
+  publishHistory,
+  content,
+  systemLogs,
+  announcements,
+} from "@src/db/schema.ts";
 import { Logger } from "@zilla/logger";
 import process from "node:process";
 import dotenv from "npm:dotenv";
@@ -21,6 +31,8 @@ const poolConnection = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
+  charset: "utf8mb4_general_ci",
+  timezone: "+08:00",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -38,6 +50,8 @@ const db = drizzle(poolConnection, {
     workflows,
     publishHistory,
     content,
+    systemLogs,
+    announcements,
   },
 });
 
