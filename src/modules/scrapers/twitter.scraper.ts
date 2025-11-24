@@ -31,12 +31,25 @@ export class TwitterScraper implements ContentScraper {
     options?: ScraperOptions,
   ): Promise<ScrapedContent[]> {
     await this.refresh();
-    const usernameMatch = sourceId.match(/x\.com\/([^\/]+)/);
-    if (!usernameMatch) {
-      throw new Error("Invalid Twitter source ID format");
+    
+    // 支持三种格式：
+    // 1. 完整URL: https://x.com/OpenAI
+    // 2. Twitter域名: twitter.com/OpenAI
+    // 3. 纯用户名: OpenAI 或 @OpenAI
+    let username: string;
+    
+    const urlMatch = sourceId.match(/(?:x\.com|twitter\.com)\/([^\/\?#]+)/);
+    if (urlMatch) {
+      username = urlMatch[1];
+    } else {
+      // 纯用户名，去掉可能的 @ 前缀
+      username = sourceId.replace(/^@/, '');
     }
-
-    const username = usernameMatch[1];
+    
+    if (!username || username.trim() === '') {
+      throw new Error(`Invalid Twitter source ID format: ${sourceId}`);
+    }
+    
     logger.debug(`Processing Twitter user: ${username}`);
 
     try {

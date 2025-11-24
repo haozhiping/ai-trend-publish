@@ -1,4 +1,9 @@
-import { getContentList, getContentById, deleteContent } from "@src/services/content.service.ts";
+import {
+  deleteContent,
+  getContentById,
+  getContentList,
+  updateContentById,
+} from "@src/services/content.service.ts";
 import { extractTokenFromHeader, verifyToken } from "@src/utils/auth/jwt.ts";
 
 interface ApiResponse<T = any> {
@@ -106,6 +111,42 @@ export async function handleDeleteContent(request: Request, id: string): Promise
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "删除内容失败";
+    return new Response(JSON.stringify(errorResponse(message, 500)), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+export async function handleUpdateContent(
+  request: Request,
+  id: string,
+): Promise<Response> {
+  try {
+    const auth = await verifyAuth(request);
+    if (!auth) {
+      return new Response(JSON.stringify(errorResponse("未授权", 401)), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const payload = await request.json();
+    if (!payload || typeof payload !== "object") {
+      return new Response(JSON.stringify(errorResponse("参数错误", 400)), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    await updateContentById(Number(id), payload);
+
+    return new Response(JSON.stringify(successResponse(null, "内容更新成功")), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "更新内容失败";
     return new Response(JSON.stringify(errorResponse(message, 500)), {
       status: 500,
       headers: { "Content-Type": "application/json" },

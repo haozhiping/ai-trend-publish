@@ -9,6 +9,7 @@ import {
   executeWorkflow,
 } from "@src/services/workflow.service.ts";
 import { extractTokenFromHeader, verifyToken } from "@src/utils/auth/jwt.ts";
+import cron from "npm:node-cron";
 
 // 统一响应格式
 interface ApiResponse<T = any> {
@@ -111,6 +112,20 @@ export async function handleCreateWorkflow(request: Request): Promise<Response> 
     }
 
     const body = await request.json();
+    
+    // 验证 Cron 表达式格式（如果提供了 schedule）
+    if (body.schedule && body.schedule.trim() !== '') {
+      if (!cron.validate(body.schedule)) {
+        return new Response(
+          JSON.stringify(errorResponse(
+            `Cron 表达式格式错误: ${body.schedule}。node-cron 仅支持 5 位标准格式（分 时 日 月 周），例如：0 3 * * * 表示每天凌晨3点`,
+            400
+          )),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    }
+    
     const workflow = await createWorkflow(body, auth.userId);
     
     return new Response(
@@ -138,6 +153,20 @@ export async function handleUpdateWorkflow(request: Request, id: string): Promis
     }
 
     const body = await request.json();
+    
+    // 验证 Cron 表达式格式（如果提供了 schedule）
+    if (body.schedule && body.schedule.trim() !== '') {
+      if (!cron.validate(body.schedule)) {
+        return new Response(
+          JSON.stringify(errorResponse(
+            `Cron 表达式格式错误: ${body.schedule}。node-cron 仅支持 5 位标准格式（分 时 日 月 周），例如：0 3 * * * 表示每天凌晨3点`,
+            400
+          )),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    }
+    
     const workflow = await updateWorkflow(Number(id), body);
     
     return new Response(

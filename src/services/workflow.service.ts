@@ -1,6 +1,6 @@
 import db from "@src/db/db.ts";
 import { workflows } from "@src/db/schema.ts";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { WorkflowType, getWorkflow } from "@src/controllers/cron.ts";
 import { Logger } from "@zilla/logger";
 import cron from "npm:node-cron";
@@ -87,7 +87,7 @@ export async function createWorkflow(data: WorkflowCreateRequest, userId?: numbe
     throw new Error(`无效的工作流类型: ${data.type}`);
   }
 
-  const [result] = await db.insert(workflows).values({
+  await db.insert(workflows).values({
     name: data.name,
     type: data.type,
     description: data.description || null,
@@ -95,9 +95,24 @@ export async function createWorkflow(data: WorkflowCreateRequest, userId?: numbe
     schedule: data.schedule || null,
     config: data.config || null,
     createdBy: userId || null,
-  }).$returning({ id: workflows.id });
+  });
 
-  const workflowId = result.id as number;
+  const [latestWorkflow] = await db
+    .select({ id: workflows.id })
+    .from(workflows)
+    .where(
+      and(
+        eq(workflows.name, data.name),
+        eq(workflows.type, data.type)
+      )
+    )
+    .orderBy(desc(workflows.id))
+    .limit(1);
+
+  if (!latestWorkflow) {
+    throw new Error("创建工作流失败：无法获取自增ID");
+  }
+  const workflowId = latestWorkflow.id;
   logger.info(`工作流创建成功: ${workflowId}`);
 
   return await getWorkflowById(workflowId);
@@ -230,23 +245,35 @@ async function startWorkflowScheduler(id: number, schedule: string) {
   // 停止旧的定时任务
   stopWorkflowScheduler(id);
 
-  // 创建新的定时任务
-  const task = cron.schedule(
-    schedule,
-    async () => {
-      try {
-        await executeWorkflow(id);
-      } catch (error) {
-        logger.error(`定时任务执行失败: ${id}`, error);
-      }
-    },
-    {
-      timezone: "Asia/Shanghai",
-    }
-  );
+  // 验证 Cron 表达式格式
+  if (!cron.validate(schedule)) {
+    logger.error(`工作流 ${id} 的 Cron 表达式格式错误: ${schedule}`);
+    logger.error(`node-cron 支持 5 位标准格式: 分 时 日 月 周 (例如: 0 3 * * *)`);
+    throw new Error(`Invalid cron expression: ${schedule}`);
+  }
 
-  workflowSchedulers.set(id, task);
-  logger.info(`工作流定时任务启动: ${id}, schedule: ${schedule}`);
+  // 创建新的定时任务
+  try {
+    const task = cron.schedule(
+      schedule,
+      async () => {
+        try {
+          await executeWorkflow(id);
+        } catch (error) {
+          logger.error(`定时任务执行失败: ${id}`, error);
+        }
+      },
+      {
+        timezone: "Asia/Shanghai",
+      }
+    );
+
+    workflowSchedulers.set(id, task);
+    logger.info(`工作流定时任务启动: ${id}, schedule: ${schedule}`);
+  } catch (error) {
+    logger.error(`创建定时任务失败 (工作流 ${id}):`, error);
+    throw error;
+  }
 }
 
 // 停止工作流定时任务
@@ -269,7 +296,13 @@ export async function initializeWorkflows() {
   for (const wf of workflowList) {
     workflowStatus.set(wf.id, "running");
     if (wf.schedule) {
-      await startWorkflowScheduler(wf.id, wf.schedule);
+      try {
+        await startWorkflowScheduler(wf.id, wf.schedule);
+      } catch (error) {
+        logger.error(`工作流 ${wf.id} (${wf.name}) 启动失败:`, error);
+        logger.error(`请检查 Cron 表达式格式: ${wf.schedule}`);
+        // 继续初始化其他工作流，不要因为一个失败就终止整个启动
+      }
     }
   }
 

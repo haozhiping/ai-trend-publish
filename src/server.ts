@@ -13,7 +13,15 @@ import {
   handleExecuteWorkflow,
 } from "./controllers/workflow-rest.controller.ts";
 import { handleGetContents, handleGetContent, handleDeleteContent } from "./controllers/content-rest.controller.ts";
-import { handleGetConfig, handleUpdateConfig } from "./controllers/config-rest.controller.ts";
+import {
+  handleGetConfig,
+  handleUpdateConfig,
+} from "./controllers/config-rest.controller.ts";
+import {
+  handleGetSystemStatus,
+  handleRefreshSystem,
+  handleRestartSystem,
+} from "./controllers/system-rest.controller.ts";
 import { initializeWorkflows } from "./services/workflow.service.ts";
 
 
@@ -198,6 +206,10 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
       // GET /api/content/:id
       return await handleGetContent(req, pathParts[2]);
     }
+    if (method === "PUT" && pathParts.length === 3) {
+      // PUT /api/content/:id
+      return await handleUpdateContent(req, pathParts[2]);
+    }
     if (method === "DELETE" && pathParts.length === 3) {
       // DELETE /api/content/:id
       return await handleDeleteContent(req, pathParts[2]);
@@ -213,6 +225,19 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
     if (method === "PUT" && pathParts.length === 2) {
       // PUT /api/config
       return await handleUpdateConfig(req);
+    }
+  }
+
+  // 系统控制接口
+  if (pathParts[0] === "api" && pathParts[1] === "system") {
+    if (method === "GET" && pathParts.length === 3 && pathParts[2] === "status") {
+      return await handleGetSystemStatus(req);
+    }
+    if (method === "POST" && pathParts.length === 3 && pathParts[2] === "refresh") {
+      return await handleRefreshSystem(req);
+    }
+    if (method === "POST" && pathParts.length === 3 && pathParts[2] === "restart") {
+      return await handleRestartSystem(req);
     }
   }
 
@@ -347,6 +372,9 @@ export default async function startServer(port = 8500) {
   console.log("  POST   /api/workflows/:id/execute - 立即执行工作流");
   console.log("  GET    /api/config               - 获取系统配置");
   console.log("  PUT    /api/config               - 更新系统配置");
+  console.log("  GET    /api/system/status        - 获取系统运行状态");
+  console.log("  POST   /api/system/refresh       - 刷新系统状态");
+  console.log("  POST   /api/system/restart       - 重启系统");
   console.log("\nJSON-RPC API (向后兼容):");
   console.log("  POST   /api/workflow           - 触发工作流");
   console.log(`  可用的工作流类型: ${Object.values(WorkflowType).join(", ")}`);
