@@ -1,6 +1,7 @@
 import { ConfigManager } from "@src/utils/config/config-manager.ts";
 import db from "@src/db/db.ts";
 import { dataSources } from "@src/db/schema.ts";
+import { eq } from "drizzle-orm";
 import { Logger } from "@zilla/logger";
 export type NewsPlatform = "firecrawl" | "twitter";
 
@@ -40,22 +41,27 @@ export const getDataSources = async (): Promise<SourceConfig> => {
       const dbResults = await db.select({
         identifier: dataSources.identifier,
         platform: dataSources.platform,
+        enabled: dataSources.enabled,
+        url: dataSources.url,
       })
-        .from(dataSources);
+        .from(dataSources)
+        .where(eq(dataSources.enabled, 1));
 
-      // 处理数据库结果
+      // 处理数据库结果 - 只处理启用的数据源
       dbResults.forEach((item) => {
-        const { platform, identifier } = item;
+        const { platform, identifier, url } = item;
+        // 优先使用 url，如果没有则使用 identifier
+        const sourceId = url || identifier;
         if (
-          identifier !== null &&
+          sourceId !== null &&
           platform !== null &&
           platform in mergedSources
         ) {
           const exists = mergedSources[platform as NewsPlatform].some(
-            (source) => source.identifier === identifier,
+            (source) => source.identifier === sourceId,
           );
           if (!exists) {
-            mergedSources[platform as NewsPlatform].push({ identifier });
+            mergedSources[platform as NewsPlatform].push({ identifier: sourceId });
           }
         }
       });

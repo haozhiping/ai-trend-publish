@@ -2,7 +2,9 @@ import cron from "npm:node-cron";
 import { WeixinArticleWorkflow } from "@src/services/weixin-article.workflow.ts";
 import { WeixinAIBenchWorkflow } from "@src/services/weixin-aibench.workflow.ts";
 import { WeixinHelloGithubWorkflow } from "@src/services/weixin-hellogithub.workflow.ts";
+import { VideoGenerateWorkflow } from "@src/services/video-generate.workflow.ts";
 import { BarkNotifier } from "@src/modules/notify/bark.notify.ts";
+import { DingdingNotify } from "@src/modules/notify/dingding.notify.ts";
 import { WorkflowEntrypoint } from "@src/works/workflow.ts";
 import { WorkflowConfigService } from "@src/services/workflow-config.service.ts";
 import { Logger } from "@zilla/logger";
@@ -11,6 +13,7 @@ export enum WorkflowType {
   WeixinArticle = "weixin-article-workflow",
   WeixinAIBench = "weixin-aibench-workflow",
   WeixinHelloGithub = "weixin-hellogithub-workflow",
+  VideoGenerate = "video-generate-workflow",
 }
 
 export function getWorkflow(type: WorkflowType): WorkflowEntrypoint {
@@ -34,6 +37,13 @@ export function getWorkflow(type: WorkflowType): WorkflowEntrypoint {
         id: "weixin-hellogithub-workflow",
         env: {
           name: "weixin-hellogithub-workflow",
+        },
+      });
+    case WorkflowType.VideoGenerate:
+      return new VideoGenerateWorkflow({
+        id: "video-generate-workflow",
+        env: {
+          name: "video-generate-workflow",
         },
       });
     default:

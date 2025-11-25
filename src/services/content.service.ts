@@ -1,6 +1,6 @@
 import db from "@src/db/db.ts";
 import { content } from "@src/db/schema.ts";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and, gte, lte, like, or } from "drizzle-orm";
 import { Logger } from "@zilla/logger";
 import { formatBeijingDateTime } from "@src/utils/time.util.ts";
 
@@ -48,11 +48,44 @@ function parseJsonArray(raw: unknown): string[] {
   }
 }
 
-export async function getContentList(): Promise<ContentListItem[]> {
-  const rows = await db
-    .select()
-    .from(content)
-    .orderBy(desc(content.publishDate ?? content.createdAt));
+export interface ContentListFilter {
+  keyword?: string;
+  source?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function getContentList(filter?: ContentListFilter): Promise<ContentListItem[]> {
+  let query = db.select().from(content);
+  
+  const conditions = [];
+  if (filter?.keyword) {
+    conditions.push(
+      or(
+        like(content.title, `%${filter.keyword}%`),
+        like(content.summary, `%${filter.keyword}%`)
+      )!
+    );
+  }
+  if (filter?.source) {
+    conditions.push(eq(content.source, filter.source));
+  }
+  if (filter?.status) {
+    conditions.push(eq(content.status, filter.status));
+  }
+  if (filter?.startDate) {
+    conditions.push(gte(content.createdAt, filter.startDate));
+  }
+  if (filter?.endDate) {
+    conditions.push(lte(content.createdAt, filter.endDate));
+  }
+  
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any;
+  }
+  
+  const rows = await query.orderBy(desc(content.createdAt));
 
   return rows.map((row) => {
     const keywords = parseJsonArray(row.keywords);

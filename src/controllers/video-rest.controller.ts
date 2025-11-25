@@ -1,11 +1,6 @@
-import {
-  deleteContent,
-  getContentById,
-  getContentList,
-  updateContentById,
-} from "@src/services/content.service.ts";
 import { extractTokenFromHeader, verifyToken } from "@src/utils/auth/jwt.ts";
 import { formatBeijingDateTime } from "@src/utils/time.util.ts";
+import { join } from "jsr:@std/path";
 
 interface ApiResponse<T = any> {
   code: number;
@@ -40,7 +35,7 @@ async function verifyAuth(request: Request): Promise<{ userId?: number } | null>
   return payload ? { userId: payload.userId } : null;
 }
 
-export async function handleGetContents(request: Request): Promise<Response> {
+export async function handleGetVideos(request: Request): Promise<Response> {
   try {
     const auth = await verifyAuth(request);
     if (!auth) {
@@ -51,21 +46,44 @@ export async function handleGetContents(request: Request): Promise<Response> {
     }
 
     const url = new URL(request.url);
-    const filter = {
-      keyword: url.searchParams.get("keyword") || undefined,
-      source: url.searchParams.get("source") || undefined,
-      status: url.searchParams.get("status") || undefined,
-      startDate: url.searchParams.get("startDate") || undefined,
-      endDate: url.searchParams.get("endDate") || undefined,
-    };
+    const outputPath = url.searchParams.get("outputPath") || 
+      "D:\\code\\weixin\\ai-trend-publish_web\\src\\video";
 
-    const list = await getContentList(filter);
-    return new Response(JSON.stringify(successResponse(list)), {
+    // 读取视频目录
+    const videos: any[] = [];
+    try {
+      const entries = Deno.readDir(outputPath);
+      for await (const entry of entries) {
+        if (entry.isFile && /\.(mp4|mov|avi)$/i.test(entry.name)) {
+          const filePath = join(outputPath, entry.name);
+          const fileStat = await Deno.stat(filePath);
+          
+          videos.push({
+            id: videos.length + 1,
+            title: entry.name.replace(/\.(mp4|mov|avi)$/i, ""),
+            filePath,
+            fileSize: fileStat.size,
+            status: "completed",
+            createdAt: fileStat.mtime?.toISOString() || new Date().toISOString(),
+          });
+        }
+      }
+    } catch (error) {
+      // 目录不存在或无法读取
+      console.warn("无法读取视频目录:", error);
+    }
+
+    // 按创建时间倒序
+    videos.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return new Response(JSON.stringify(successResponse(videos)), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "获取内容列表失败";
+    const message = error instanceof Error ? error.message : "获取视频列表失败";
     return new Response(JSON.stringify(errorResponse(message, 500)), {
       status: 500,
       headers: { "Content-Type": "application/json" },
@@ -73,62 +91,7 @@ export async function handleGetContents(request: Request): Promise<Response> {
   }
 }
 
-export async function handleGetContent(request: Request, id: string): Promise<Response> {
-  try {
-    const auth = await verifyAuth(request);
-    if (!auth) {
-      return new Response(JSON.stringify(errorResponse("未授权", 401)), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const item = await getContentById(Number(id));
-    if (!item) {
-      return new Response(JSON.stringify(errorResponse("内容不存在", 404)), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify(successResponse(item)), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "获取内容详情失败";
-    return new Response(JSON.stringify(errorResponse(message, 500)), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-}
-
-export async function handleDeleteContent(request: Request, id: string): Promise<Response> {
-  try {
-    const auth = await verifyAuth(request);
-    if (!auth) {
-      return new Response(JSON.stringify(errorResponse("未授权", 401)), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    await deleteContent(Number(id));
-    return new Response(JSON.stringify(successResponse(null, "内容已删除")), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "删除内容失败";
-    return new Response(JSON.stringify(errorResponse(message, 500)), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-}
-
-export async function handleUpdateContent(
+export async function handleGetVideoStream(
   request: Request,
   id: string,
 ): Promise<Response> {
@@ -141,22 +104,13 @@ export async function handleUpdateContent(
       });
     }
 
-    const payload = await request.json();
-    if (!payload || typeof payload !== "object") {
-      return new Response(JSON.stringify(errorResponse("参数错误", 400)), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    await updateContentById(Number(id), payload);
-
-    return new Response(JSON.stringify(successResponse(null, "内容更新成功")), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    // TODO: 实现视频流传输
+    return new Response("视频流功能待实现", {
+      status: 501,
+      headers: { "Content-Type": "text/plain" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "更新内容失败";
+    const message = error instanceof Error ? error.message : "获取视频流失败";
     return new Response(JSON.stringify(errorResponse(message, 500)), {
       status: 500,
       headers: { "Content-Type": "application/json" },
@@ -164,4 +118,57 @@ export async function handleUpdateContent(
   }
 }
 
+export async function handleDownloadVideo(
+  request: Request,
+  id: string,
+): Promise<Response> {
+  try {
+    const auth = await verifyAuth(request);
+    if (!auth) {
+      return new Response(JSON.stringify(errorResponse("未授权", 401)), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // TODO: 实现视频下载
+    return new Response("视频下载功能待实现", {
+      status: 501,
+      headers: { "Content-Type": "text/plain" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "下载视频失败";
+    return new Response(JSON.stringify(errorResponse(message, 500)), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+export async function handleDeleteVideo(
+  request: Request,
+  id: string,
+): Promise<Response> {
+  try {
+    const auth = await verifyAuth(request);
+    if (!auth) {
+      return new Response(JSON.stringify(errorResponse("未授权", 401)), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // TODO: 实现视频删除
+    return new Response(JSON.stringify(successResponse(null, "视频已删除")), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "删除视频失败";
+    return new Response(JSON.stringify(errorResponse(message, 500)), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
 

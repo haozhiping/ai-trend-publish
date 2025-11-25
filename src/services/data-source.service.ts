@@ -44,7 +44,7 @@ function mapRow(row: any): DataSourceRecord {
 }
 
 export async function listDataSources(): Promise<DataSourceRecord[]> {
-  const rows = await db.select().from(dataSources).orderBy(desc(dataSources.id));
+  const rows = await db.select().from(dataSources).orderBy(desc(dataSources.createdAt));
   return rows.map(mapRow);
 }
 

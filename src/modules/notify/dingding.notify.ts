@@ -65,13 +65,15 @@ export class DingdingNotify implements INotifier {
         return false;
       }
 
-      // 构建消息内容
+      // 构建消息内容（钉钉机器人需要包含关键词）
+      const messageContent = `${this.keyword}\n通知：${title}\n${content}${
+        options.url ? `\n详情链接：${options.url}` : ""
+      }`;
+      
       const message = {
         msgtype: "text",
         text: {
-          content: `通知：${title}\n${content}${
-            options.url ? `\n详情链接：${options.url}` : ""
-          }`,
+          content: messageContent,
         },
         at: {
           isAtAll: options.level === "timeSensitive", // 紧急消息@所有人

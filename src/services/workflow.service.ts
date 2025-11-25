@@ -245,6 +245,9 @@ export async function executeWorkflow(id: number) {
       workflowInstance.getLastRunResult(),
     );
     logger.info(`工作流执行成功: ${id}`);
+    
+    // 发送成功通知
+    await sendWorkflowNotification(workflow, "success", "工作流执行成功");
   }).catch(async (error) => {
     await db.update(workflows)
       .set({
@@ -258,12 +261,64 @@ export async function executeWorkflow(id: number) {
       workflowInstance.getLastRunResult(),
     );
     logger.error(`工作流执行失败: ${id}`, error);
+    
+    // 发送失败通知
+    await sendWorkflowNotification(workflow, "error", `工作流执行失败: ${error instanceof Error ? error.message : String(error)}`);
   });
 
   return {
     message: "工作流已开始执行",
     workflowId: id,
   };
+}
+
+// 发送工作流通知
+async function sendWorkflowNotification(
+  workflow: any,
+  status: "success" | "error" | "warning",
+  message: string
+) {
+  try {
+    const { BarkNotifier } = await import("@src/modules/notify/bark.notify.ts");
+    const { DingdingNotify } = await import("@src/modules/notify/dingding.notify.ts");
+    
+    const title = `工作流 ${status === "success" ? "执行成功" : status === "error" ? "执行失败" : "执行警告"}: ${workflow.name}`;
+    const content = `${message}\n工作流ID: ${workflow.id}\n工作流类型: ${workflow.type}\n执行时间: ${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`;
+    
+    const barkNotifier = new BarkNotifier();
+    const dingdingNotifier = new DingdingNotify();
+    
+    // 如果工作流配置中有钉钉关键词，使用它
+    if (workflow.config?.dingtalkKeyword) {
+      dingdingNotifier.setKeyword(workflow.config.dingtalkKeyword);
+    }
+    
+    // 并行发送通知
+    const notifications = [];
+    
+    // Bark 通知
+    if (status === "success") {
+      notifications.push(barkNotifier.success(title, content));
+    } else if (status === "error") {
+      notifications.push(barkNotifier.error(title, content));
+    } else {
+      notifications.push(barkNotifier.warning(title, content));
+    }
+    
+    // 钉钉通知
+    if (status === "success") {
+      notifications.push(dingdingNotifier.success(title, content));
+    } else if (status === "error") {
+      notifications.push(dingdingNotifier.error(title, content));
+    } else {
+      notifications.push(dingdingNotifier.warning(title, content));
+    }
+    
+    await Promise.allSettled(notifications);
+  } catch (error) {
+    // 通知发送失败不应该影响主流程
+    logger.warn("发送工作流通知失败:", error);
+  }
 }
 
 // 启动工作流定时任务

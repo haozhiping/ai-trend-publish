@@ -59,6 +59,12 @@ import {
 } from "./controllers/announcement.controller.ts";
 import { handleGetDashboardOverview } from "./controllers/dashboard.controller.ts";
 import { initializeWorkflows } from "./services/workflow.service.ts";
+import {
+  handleGetVideos,
+  handleGetVideoStream,
+  handleDownloadVideo,
+  handleDeleteVideo,
+} from "./controllers/video-rest.controller.ts";
 
 
 export interface JSONRPCRequest {
@@ -366,6 +372,26 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
   if (pathParts[0] === "api" && pathParts[1] === "dashboard" && pathParts[2] === "overview") {
     if (method === "GET") {
       return await handleGetDashboardOverview(req);
+    }
+  }
+
+  // 视频管理接口
+  if (pathParts[0] === "api" && pathParts[1] === "videos") {
+    if (method === "GET" && pathParts.length === 2) {
+      // GET /api/videos
+      return await handleGetVideos(req);
+    }
+    if (method === "GET" && pathParts.length === 4 && pathParts[3] === "stream") {
+      // GET /api/videos/:id/stream
+      return await handleGetVideoStream(req, pathParts[2]);
+    }
+    if (method === "GET" && pathParts.length === 4 && pathParts[3] === "download") {
+      // GET /api/videos/:id/download
+      return await handleDownloadVideo(req, pathParts[2]);
+    }
+    if (method === "DELETE" && pathParts.length === 3) {
+      // DELETE /api/videos/:id
+      return await handleDeleteVideo(req, pathParts[2]);
     }
   }
 

@@ -44,7 +44,7 @@ function mapAnnouncement(row: any): AnnouncementRecord {
 }
 
 export async function listAnnouncements(): Promise<AnnouncementRecord[]> {
-  const rows = await db.select().from(announcements).orderBy(desc(announcements.publishTime));
+  const rows = await db.select().from(announcements).orderBy(desc(announcements.createdAt));
   return rows.map(mapAnnouncement);
 }
 

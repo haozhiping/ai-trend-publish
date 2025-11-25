@@ -42,7 +42,7 @@ function mapTemplate(row: any): TemplateRecord {
 }
 
 export async function listTemplates(): Promise<TemplateRecord[]> {
-  const rows = await db.select().from(templates).orderBy(desc(templates.id));
+  const rows = await db.select().from(templates).orderBy(desc(templates.createdAt));
   return rows.map(mapTemplate);
 }
 
@@ -128,5 +128,27 @@ async function setDefaultTemplateByType(type: string, idToKeep?: number) {
       .set({ isDefault: 1, updatedAt: getBeijingNow() })
       .where(and(eq(templates.type, type), eq(templates.id, idToKeep)));
   }
+}
+
+export async function getDefaultTemplateByType(type: string): Promise<TemplateRecord | null> {
+  const rows = await db
+    .select()
+    .from(templates)
+    .where(and(eq(templates.type, type), eq(templates.isDefault, 1)))
+    .limit(1);
+  
+  if (rows.length === 0) {
+    // 如果没有默认模板，返回该类型的第一个模板
+    const fallbackRows = await db
+      .select()
+      .from(templates)
+      .where(eq(templates.type, type))
+      .orderBy(desc(templates.createdAt))
+      .limit(1);
+    if (fallbackRows.length === 0) return null;
+    return mapTemplate(fallbackRows[0]);
+  }
+  
+  return mapTemplate(rows[0]);
 }
 
