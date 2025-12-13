@@ -1,7 +1,7 @@
 {
   "nodeModulesDir": "auto",
   "tasks": {
-    "start": "deno run -A src/index.ts",
+    "start": "deno run -A --env src/index.ts",
     "test": "deno run -A  src/test.ts",
     "init:config": "deno run --allow-read --allow-env --allow-net scripts/init-config-from-env.ts",
     "build:win": "deno compile -A --target x86_64-pc-windows-msvc --output trendFinder.exe --icon ./docs/images/main.ico --include src/modules/render/templates src/test.ts ",

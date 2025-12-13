@@ -1,7 +1,7 @@
 import { triggerWorkflow } from "./controllers/workflow.controller.ts";
 import { WorkflowType } from "./controllers/cron.ts";
 import { ConfigManager } from "@src/utils/config/config-manager.ts";
-import { handleLogin, handleGetUser, handleLogout } from "./controllers/auth.controller.ts";
+import { handleLogin, handleGetUser, handleLogout, handleVerifyMainToken } from "./controllers/auth.controller.ts";
 import {
   handleGetWorkflows,
   handleGetWorkflow,
@@ -197,6 +197,28 @@ async function handleRestApi(req: Request, path: string): Promise<Response | nul
     }
     if (pathParts[2] === "logout" && method === "POST") {
       return await handleLogout(req);
+    }
+    if (pathParts[2] === "verify-main-token" && method === "POST") {
+      return await handleVerifyMainToken(req);
+    }
+    // 获取登录配置（前端用于判断是否使用主系统登录）
+    if (pathParts[2] === "config" && method === "GET") {
+      const useMainSystemAuth = Deno.env.get("USE_MAIN_SYSTEM_AUTH") !== "false"; // 默认true
+      const mainFrontendUrl = Deno.env.get("MAIN_FRONTEND_URL");
+      return new Response(
+        JSON.stringify({
+          code: 200,
+          message: "获取成功",
+          data: {
+            useMainSystemAuth,
+            mainFrontendUrl,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
   }
 
@@ -501,7 +523,22 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-export default async function startServer(port = 8500) {
+export default async function startServer(port?: number) {
+  // 优先使用传入的端口，其次从环境变量读取
+  let serverPort = port;
+  if (!serverPort) {
+    const portEnv = Deno.env.get("PORT");
+    if (portEnv) {
+      serverPort = parseInt(portEnv);
+    }
+  }
+  
+  if (!serverPort || isNaN(serverPort)) {
+    console.error("环境变量 PORT 未配置或无效");
+    console.error("当前 PORT 值:", Deno.env.get("PORT"));
+    console.error("提示: 请在 .env 文件中配置 PORT=8500");
+    throw new Error("环境变量 PORT 未配置");
+  }
   // 初始化工作流服务（从数据库加载运行中的工作流）
   try {
     await initializeWorkflows();
@@ -509,8 +546,12 @@ export default async function startServer(port = 8500) {
     console.error("初始化工作流失败:", error);
   }
 
-  Deno.serve({ port }, handler);
-  console.log(`服务器运行在 http://localhost:${port}`);
+  Deno.serve({ port: serverPort }, handler);
+  const host = Deno.env.get("HOST");
+  if (!host) {
+    throw new Error("环境变量 HOST 未配置");
+  }
+  console.log(`服务器运行在 http://${host}:${serverPort}`);
   console.log("\n支持的接口:");
   console.log("REST API:");
   console.log("  POST   /api/auth/login          - 用户登录");

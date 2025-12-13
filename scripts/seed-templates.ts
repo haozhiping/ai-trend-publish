@@ -11,7 +11,7 @@ const templateSeeds = [
     style: "dashscope",
     type: "article",
     previewUrl:
-      "https://img.alicdn.com/imgextra/i4/O1CN01k6O1pt1MUBwpl5a7V_!!6000000001437-0-tps-1920-960.jpg",
+      "",
     content:
       `<section class="hero" style="padding:40px;background:#f7fbff;border-radius:18px;margin-bottom:24px;">
   <p style="color:#1677ff;font-weight:600;">DashScope · 灵积智算</p>
@@ -31,7 +31,7 @@ const templateSeeds = [
     style: "openai-weekly",
     type: "article",
     previewUrl:
-      "https://img.alicdn.com/imgextra/i3/O1CN01DvYbmh1hS7IRsEh4N_!!6000000004302-0-tps-1920-960.jpg",
+      "",
     content:
       `<section style="background:#0f172a;color:#fff;padding:36px;border-radius:18px;margin-bottom:20px;">
   <p style="letter-spacing:2px;text-transform:uppercase;font-size:12px;">OpenAI Dev Report</p>
@@ -52,7 +52,7 @@ const templateSeeds = [
     style: "zhihu-tech",
     type: "article",
     previewUrl:
-      "https://img.alicdn.com/imgextra/i2/O1CN01vT0GfZ1rOEb4v3MUq_!!6000000005573-0-tps-1920-960.jpg",
+      "",
     content:
       `<header style="border-left:4px solid #3b82f6;padding-left:16px;margin-bottom:18px;">
   <h1 style="margin-bottom:6px;font-size:26px;">{{title}}</h1>
@@ -73,7 +73,7 @@ const templateSeeds = [
     style: "multi-card",
     type: "article",
     previewUrl:
-      "https://img.alicdn.com/imgextra/i2/O1CN01gELPmx1Yz7zsqJ7Jm_!!6000000003241-0-tps-1920-960.jpg",
+      "",
     content:
       `<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
   <article style="padding:16px;border:1px solid #e5e7eb;border-radius:16px;">
